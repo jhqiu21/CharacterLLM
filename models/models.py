@@ -14,9 +14,10 @@ Tensor shape conventions used below:
 - V: vocabulary size
 """
 
-import jax.numpy as jnp
 import flax.linen as nn
+import jax.numpy as jnp
 from flax.linen import attention as attn
+
 
 class MLP(nn.Module):
         """Transformer feed-forward network (a.k.a. MLP block).
@@ -43,6 +44,7 @@ class MLP(nn.Module):
                 x = nn.gelu(x)
                 x = nn.Dense(self.d_model)(x)
                 return x
+
 
 class DecoderBlock(nn.Module):
     """A single decoder block (Pre-LayerNorm + Self-Attn + MLP + residuals).
@@ -77,6 +79,7 @@ class DecoderBlock(nn.Module):
         h = MLP(self.d_model, mlp_ratio=self.mlp_ratio)(h)
         x = x + h  # residual connection
         return x
+
 
 class DecoderOnlyTransformer(nn.Module):
     """GPT-style decoder-only Transformer for language modeling.
@@ -154,5 +157,5 @@ class DecoderOnlyTransformer(nn.Module):
 
         # Output projection to logits over V tokens.
         logits = self.project_to_vocab(x)
-        
+
         return logits
