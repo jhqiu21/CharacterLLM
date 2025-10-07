@@ -37,7 +37,7 @@ repos:
     hooks:
       - id: ruff-all
         name: ruff check (entire repo, incl. untracked)
-        entry: bash -c 'ruff check --output-format=github --show-source .'
+        entry: bash -c 'ruff check --output-format=github --show-files .'
         language: system
         pass_filenames: false
         always_run: true
@@ -45,7 +45,7 @@ repos:
 
       - id: nbqa-ruff-all
         name: nbqa ruff (entire repo notebooks)
-        entry: bash -c 'nbqa ruff --output-format=github --show-source .'
+        entry: bash -c 'nbqa ruff --output-format=github --show-files .'
         language: system
         pass_filenames: false
         always_run: true
