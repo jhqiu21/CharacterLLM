@@ -8,7 +8,7 @@ target-version = "py310"
 select = ["E", "W", "F", "I"]
 ignore = ["C90"]
 preview = true
-extend-select = ["E2"]
+
 
 
 [tool.ruff.format]
