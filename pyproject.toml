@@ -7,8 +7,7 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "W", "F", "I"]
 ignore = ["C90"]
-fix = false
-unsafe-fixes = false
+
 
 [tool.ruff.format]
 quote-style = "double"
