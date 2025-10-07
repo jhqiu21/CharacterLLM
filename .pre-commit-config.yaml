@@ -11,11 +11,6 @@ repos:
         args: ["--output-format=github"]
         stages: [manual, pre-commit]
         exclude: ^data/
-      - id: ruff-format
-        name: ruff format (check only)
-        args: ["--check"]
-        stages: [manual, pre-commit]
-        exclude: ^data/
 
   # --- Notebooks ---
   - repo: https://github.com/nbQA-dev/nbQA
