@@ -10,10 +10,12 @@ repos:
         # Ruff reads config from pyproject.toml if available
         args: ["--output-format=github"]
         stages: [manual, pre-commit]
+        exclude: ^data/
       - id: ruff-format
         name: ruff format (check only)
         args: ["--check"]
         stages: [manual, pre-commit]
+        exclude: ^data/
 
   # --- Notebooks ---
   - repo: https://github.com/nbQA-dev/nbQA
@@ -23,6 +25,7 @@ repos:
         name: nbqa ruff (ipynb code cells)
         args: ["--output-format=github"]
         stages: [manual, pre-commit]
+        exclude: ^data/
 
   # --- Comment & Misc ---
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -30,10 +33,13 @@ repos:
     hooks:
       - id: check-merge-conflict
         stages: [manual, pre-commit]
+        exclude: ^data/
       - id: end-of-file-fixer
         stages: [pre-commit]
+        exclude: ^data/
       - id: trailing-whitespace
         stages: [pre-commit]
+        exclude: ^data/
 
   # --- Custom hooks for full repo checks ---
   - repo: local
@@ -45,6 +51,7 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [manual]
+        exclude: ^data/
 
       - id: nbqa-ruff-all
         name: nbqa ruff (entire repo notebooks)
@@ -53,3 +60,4 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [manual]
+        exclude: ^data/
