@@ -181,7 +181,6 @@ datasets/
 outputs/
 logs/
 checkpoints/
-models/
 *.ckpt
 *.h5
 *.pt
