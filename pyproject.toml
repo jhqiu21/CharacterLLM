@@ -1,6 +1,6 @@
 [tool.ruff]
 src = ["."]
-line-length = 120
+line-length = 140
 indent-width = 4
 target-version = "py310"
 
@@ -16,4 +16,4 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.nbqa]
-addopts = ["--line-length=120"]
+addopts = ["--line-length=140"]

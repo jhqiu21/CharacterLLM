@@ -176,7 +176,7 @@ $RECYCLE.BIN/
 # ==========================================
 # Data / output / experiment artifacts
 # ==========================================
-data/
+
 datasets/
 outputs/
 logs/
