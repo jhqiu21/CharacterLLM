@@ -29,11 +29,6 @@ For additional safety, enable branch protection to require the **CheckStyle** jo
     conda activate charllm-env
     ```
 
-1. Install the Git hook (we default to manual stage; this is not required)
-    ```bash
-    pre-commit install -f --hook-type pre-commit
-    ```
-
 1. Check code style locally
 
     - Run on the entire working tree
