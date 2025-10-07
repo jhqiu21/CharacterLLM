@@ -1,0 +1,34 @@
+name: charllm-env
+channels:
+  - pytorch
+  - defaults
+
+dependencies:
+  # ==== Basic environment ====
+  - python=3.10
+  - pip
+  - numpy
+  - matplotlib
+  - scikit-learn
+  - pandas
+  - scipy
+  - jupyterlab
+
+  # ==== PyTorch (CPU version) ====
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cpuonly            # For GPU: replace with "pytorch-cuda=11.8" and add "-nvidia" channel
+
+  # ==== Packages installed via pip ====
+  - pip:
+      # JAX (select the corresponding version based on hardware)
+      - "jax[cpu]"             # For GPU users, replace with "jax[cuda12]" or "jax[cuda11]"
+
+      # ====== Code quality & style checks ======
+      - ruff                   # Unified linting and formatting
+      - nbqa                   # Enable Ruff checks for Jupyter Notebooks
+      - pre-commit             # Automatically run checks before Git commits
+      - black                  # (Optional) Standalone Black formatter
+      - mypy                   # (Optional) Type checking tool
+      - bandit                 # (Optional) Security scanner

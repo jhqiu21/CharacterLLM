@@ -1,0 +1,31 @@
+name: Lint Python & Notebooks
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff nbqa
+
+      - name: Check Python files
+        run: ruff check . --output-format=github
+
+      - name: Check Notebooks
+        run: nbqa ruff check . --output-format=github
+
+      - name: Check formatting
+        run: |
+          ruff format . --check
+          nbqa ruff format . --check
