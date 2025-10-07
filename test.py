@@ -6,6 +6,7 @@ if __name__ == "__main__":
     func()
 
 def test():
+    #comment
     a= 1
     b= 2
     assert a+b  ==3
