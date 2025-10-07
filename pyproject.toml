@@ -1,15 +1,7 @@
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+extend-exclude = ["build", "dist", ".venv", "venv", ".ipynb_checkpoints"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
-
-extend-exclude = ["build", "dist", ".venv", "venv", ".ipynb_checkpoints"]
-
-[tool.nbqa.config]
-
-addopts = ["--stdin-filename", "."]
-mutate = false
-
-[tool.nbqa.ruff]
