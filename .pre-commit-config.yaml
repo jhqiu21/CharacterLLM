@@ -7,14 +7,13 @@ repos:
     hooks:
       - id: ruff
         name: ruff (lint py files)
-        args: [
-          "--select=E,W,F,I",
-          "--output-format=github",
-          "--show-source",
-        ]
+        # Ruff reads config from pyproject.toml if available
+        args: ["--output-format=github", "--show-source"]
+        stages: [manual, pre-commit]
       - id: ruff-format
         name: ruff format (check only)
         args: ["--check"]
+        stages: [manual, pre-commit]
 
   # --- Notebooks ---
   - repo: https://github.com/nbQA-dev/nbQA
@@ -22,22 +21,26 @@ repos:
     hooks:
       - id: nbqa-ruff
         name: nbqa ruff (ipynb code cells)
-        args: [--output-format=github]
+        args: ["--output-format=github", "--show-source"]
+        stages: [manual, pre-commit]
 
   # --- Comment & Misc ---
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: check-merge-conflict
+        stages: [manual, pre-commit]
       - id: end-of-file-fixer
+        stages: [manual, pre-commit]
       - id: trailing-whitespace
+        stages: [manual, pre-commit]
 
   # --- Custom hooks for full repo checks ---
   - repo: local
     hooks:
       - id: ruff-all
         name: ruff check (entire repo, incl. untracked)
-        entry: bash -c 'ruff check --output-format=github --show-files .'
+        entry: bash -c 'ruff check --output-format=github --show-source .'
         language: system
         pass_filenames: false
         always_run: true
@@ -45,7 +48,7 @@ repos:
 
       - id: nbqa-ruff-all
         name: nbqa ruff (entire repo notebooks)
-        entry: bash -c 'nbqa ruff --output-format=github --show-files .'
+        entry: bash -c 'nbqa ruff --output-format=github --show-source .'
         language: system
         pass_filenames: false
         always_run: true
