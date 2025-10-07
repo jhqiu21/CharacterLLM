@@ -24,7 +24,9 @@ dependencies:
   - pip:
       # JAX (select the corresponding version based on hardware)
       - "jax[cpu]"             # For GPU users, replace with "jax[cuda12]" or "jax[cuda11]"
-
+      # deep learning libraries
+      - flax
+      - optax
       # ====== Code quality & style checks ======
       - ruff                   # Unified linting and formatting
       - nbqa                   # Enable Ruff checks for Jupyter Notebooks
