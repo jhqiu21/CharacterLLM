@@ -1,16 +1,22 @@
+default_stages: [manual]
+
 repos:
   # --- Python ---
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.4
     hooks:
       - id: ruff
-        name: ruff (py files)
-        args: [--output-format=github]
+        name: ruff (lint py files)
+        args: [
+          "--select=E,W,F,I",
+          "--output-format=github",
+          "--show-source",
+        ]
       - id: ruff-format
-        name: ruff format (py files, check only)
-        args: [--check]
+        name: ruff format (check only)
+        args: ["--check"]
 
-  # --- Notebooks: using nbQA ---
+  # --- Notebooks ---
   - repo: https://github.com/nbQA-dev/nbQA
     rev: 1.9.1
     hooks:
@@ -18,10 +24,29 @@ repos:
         name: nbqa ruff (ipynb code cells)
         args: [--output-format=github]
 
-  # --- misc ---
+  # --- Comment & Misc ---
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: check-merge-conflict
       - id: end-of-file-fixer
       - id: trailing-whitespace
+
+  # --- Custom hooks for full repo checks ---
+  - repo: local
+    hooks:
+      - id: ruff-all
+        name: ruff check (entire repo, incl. untracked)
+        entry: bash -c 'ruff check --output-format=github --show-source .'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [manual]
+
+      - id: nbqa-ruff-all
+        name: nbqa ruff (entire repo notebooks)
+        entry: bash -c 'nbqa ruff --output-format=github --show-source .'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [manual]

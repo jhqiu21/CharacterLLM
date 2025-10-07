@@ -1,7 +1,18 @@
 [tool.ruff]
+src = ["."]
 line-length = 120
+indent-width = 4
 target-version = "py310"
-extend-exclude = ["build", "dist", ".venv", "venv", ".ipynb_checkpoints"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+select = ["E", "W", "F", "I"]
+ignore = ["C90"]
+fix = false
+unsafe-fixes = false
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.nbqa]
+addopts = ["--line-length=120"]
