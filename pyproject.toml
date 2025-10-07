@@ -5,8 +5,8 @@ indent-width = 4
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I"]
-ignore = ["C90", "E117"]
+select = ["E", "W", "F"]
+ignore = ["C90", "E117", "E231", "E226"]
 preview = true
 
 
