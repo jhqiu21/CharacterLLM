@@ -1,16 +1,27 @@
 repos:
-  # Python code style check and auto-fix
+  # --- Python ---
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.8    # Ruff version
+    rev: v0.6.4
     hooks:
       - id: ruff
-        args: [--fix]          # Automatically fix common issues
-      - id: ruff-format        # Formatting check (equivalent to Black)
+        name: ruff (py files)
+        args: [--output-format=github]
+      - id: ruff-format
+        name: ruff format (py files, check only)
+        args: [--check]
 
-  # Notebook code style check and auto-fix
+  # --- Notebooks: using nbQA ---
   - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.8.5
+    rev: 1.9.1
     hooks:
       - id: nbqa-ruff
-        args: [--fix]          # Automatically fix issues reported by Ruff in Notebooks
-      - id: nbqa-ruff-format   # Notebook code formatting
+        name: nbqa ruff (ipynb code cells)
+        args: [--output-format=github]
+
+  # --- misc ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
