@@ -185,7 +185,6 @@ checkpoints/
 *.h5
 *.pt
 *.pth
-*.pdf
 
 # ==========================================
 # Miscellaneous tools
