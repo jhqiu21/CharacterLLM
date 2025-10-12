@@ -20,7 +20,7 @@ from flax.linen import attention as attn
 
 
 class MLP(nn.Module):
-        """Transformer feed-forward network (a.k.a. MLP block)
+        """Transformer feed-forward network (a.k.a. MLP block).
 
         Structure: Dense(D -> 4D), GELU, Dense(4D -> D) by default.
         The expansion factor can be adjusted with `mlp_ratio`.
