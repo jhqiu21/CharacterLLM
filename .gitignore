@@ -185,6 +185,8 @@ checkpoints/
 *.h5
 *.pt
 *.pth
+*.json
+*.png
 
 # ==========================================
 # Miscellaneous tools
