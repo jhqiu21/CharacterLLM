@@ -1,87 +1,115 @@
 # lstm_baseline.py
 """
-Character-level LSTM baseline:
-    - Input:  (B, T) token ids
-    - Output: (B, T, V) logits (predicting next token for each position)
-    - Training/validation can share the same loss_fn / train_step as Transformer
+Character-level LSTM baseline (robust, extensible):
+  - Input:  (B, T) int32 token ids
+  - Output: (B, T, V) logits
+Design notes:
+  * No Modules are called inside lax.scan's step to avoid tracer leaks.
+  * All parameters are created once via `self.param` inside `@nn.compact`.
+  * Variational dropout: one mask per layer per batch (shared across time steps).
+  * Optional weight tying with the input embedding.
 """
+
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
 
+
 class CharLSTM(nn.Module):
     vocab_size: int
     hidden_size: int = 512
-    num_layers: int = 2
+    n_layers: int = 2
     dropout: float = 0.1
-    max_len: int = 128        # not used but for compatibility
-    # if you want to share weights with output layer, can be extended later
-    tie_weights: bool = False
-    
-    def setup(self):
-        # Map token ids to continuous vector space with dimension hidden_size for LSTM input
-        self.embed = nn.Embed(num_embeddings=self.vocab_size, features=self.hidden_size)
+    max_len: int = 128
+    tie_weights: bool = False  # if True: use E^T for projection
 
-        # Stack multiple LSTMCells; we will use lax.scan to iterate these cells over time
-        self.cells = [nn.LSTMCell() for _ in range(self.num_layers)]
-
-        # output projection layer: map final hidden state h at each time step to vocab size V to get logits
-        self.proj = nn.Dense(self.vocab_size, use_bias=False)
-
-        # FIXME: If you want to implement tie weights, you should use a shared parameter here.
-        # But for simplicity, we skip it now.
-
-    def __call__(self, idx: jnp.ndarray, *, train: bool = True):
+    @nn.compact
+    def __call__(self, idx: jnp.ndarray, train: bool = True) -> jnp.ndarray:
         """
-        前向计算：
-        idx: (B, T) int32 的 token ids
-        return: logits (B, T, V)
+        Args:
+          idx: (B, T) int32 token ids
+          train: enable dropout behavior when True
+        Returns:
+          logits: (B, T, V)
         """
-        # Embed the integer token ids into vectors of shape (B, T, H)
-        x = self.embed(idx)
+        # 1) Embedding parameters and lookup
+        embed = nn.Embed(num_embeddings=self.vocab_size, features=self.hidden_size, name="embed")
+        x = embed(idx)  # (B, T, H)
         B, T, H = x.shape
 
-        # initialize the (c, h) states for each LSTM layer
+        # 2) LSTM stacked parameters (create once as raw tensors)
+        #    For each layer i, we use: gates = x @ W_x[i] + h @ W_h[i] + b[i]
+        #    where gates split into (i, f, g, o)
+        Wx = []  # input-to-gates weights: (H, 4H)
+        Wh = []  # hidden-to-gates weights: (H, 4H)
+        b = []   # gates bias: (4H,)
+        for i in range(self.n_layers):
+            Wx.append(self.param(f"Wx_{i}", nn.initializers.lecun_normal(), (H, 4 * H)))
+            Wh.append(self.param(f"Wh_{i}", nn.initializers.orthogonal(), (H, 4 * H)))
+            b.append(self.param(f"b_{i}", nn.initializers.zeros, (4 * H,)))
+
+        # 3) Variational dropout masks (one per layer, shared across time)
+        #    This avoids calling nn.Dropout inside scan.
+        if train and self.dropout > 0.0:
+            rng = self.make_rng("dropout")
+            rngs = jax.random.split(rng, max(self.n_layers - 1, 1))  # no mask for last layer by default
+            keep = 1.0 - self.dropout
+            masks = []
+            for i in range(self.n_layers):
+                if i < self.n_layers - 1:
+                    m = jax.random.bernoulli(rngs[min(i, len(rngs)-1)], p=keep, shape=(B, H))
+                    masks.append(m.astype(x.dtype) / keep)  # rescale to keep expectation
+                else:
+                    masks.append(jnp.ones((B, H), dtype=x.dtype))
+        else:
+            masks = [jnp.ones((B, H), dtype=x.dtype) for _ in range(self.n_layers)]
+
+        # 4) Initial (c, h) states for each layer
         init_states = tuple(
-            (jnp.zeros((B, self.hidden_size), dtype=x.dtype),
-             jnp.zeros((B, self.hidden_size), dtype=x.dtype))
-            for _ in range(self.num_layers)
+            (jnp.zeros((B, H), dtype=x.dtype), jnp.zeros((B, H), dtype=x.dtype))
+            for _ in range(self.n_layers)
         )
 
-        # set dropout rate based on train/eval mode
-        dropout_rate = self.dropout if train else 0.0
-
+        # 5) One time step: pure JAX math (no Module calls inside)
         def step(carry, x_t):
             """
-            Single-step recurrence function: inputs the states of all layers at the previous time step
-            + the embedding at the current time step, outputs the new states + the top output 
-
-            carry: tuple[(c_i, h_i)] * num_layers, each of shape (B, H)
-            x_t:   (B, H) input vector at current time step t
-            return:
-                new_carry: updated (c_i, h_i)
-                top_h:     hidden state h_t of the top LSTM (as the representation at this time step)
+            carry: tuple of (c_i, h_i) for i in [0..n_layers-1]
+            x_t:   (B, H)
+            returns: (new_carry, top_h)
             """
             new_states = []
-            h = x_t
-            for i, cell in enumerate(self.cells):
+            h_in = x_t
+            for i in range(self.n_layers):
                 c_prev, h_prev = carry[i]
-                (c_new, h_new), y = cell((c_prev, h_prev), h)  # y == h_new
-                h = y
-                if dropout_rate > 0.0:
-                    # Apply dropout to the outputs of each layer except the last
-                    h = nn.Dropout(rate=dropout_rate)(h, deterministic=not train)
+                gates = h_in @ Wx[i] + h_prev @ Wh[i] + b[i]  # (B, 4H)
+                i_gate, f_gate, g_gate, o_gate = jnp.split(gates, 4, axis=-1)
+                i_gate = jax.nn.sigmoid(i_gate)
+                f_gate = jax.nn.sigmoid(f_gate)
+                g_gate = jnp.tanh(g_gate)
+                o_gate = jax.nn.sigmoid(o_gate)
+
+                c_new = f_gate * c_prev + i_gate * g_gate
+                h_new = o_gate * jnp.tanh(c_new)
+
+                # apply variational dropout mask between layers (skip on last layer)
+                h_out = h_new * masks[i]
                 new_states.append((c_new, h_new))
-            return tuple(new_states), h
+                h_in = h_out  # feed to next layer
 
-        # Use jax.lax.scan to unroll the LSTM over time steps
-        x_time_major = jnp.swapaxes(x, 0, 1)                    # (T, B, H)
-        states_final, hs_time_major = jax.lax.scan(step, init_states, x_time_major)
-        # hs_time_major: (T, B, H) -- hidden states from top LSTM layer at all time steps
+            top_h = h_in  # (B, H)
+            return tuple(new_states), top_h
 
-        # Convert back to (B, T, H)
-        hs = jnp.swapaxes(hs_time_major, 0, 1)                  # (B, T, H)
+        # 6) Scan over time: (B,T,H) -> (T,B,H) -> scan -> (B,T,H)
+        x_tm = jnp.swapaxes(x, 0, 1)      # (T, B, H)
+        _, hs_tm = jax.lax.scan(step, init_states, x_tm)
+        hs = jnp.swapaxes(hs_tm, 0, 1)    # (B, T, H)
 
-        # Project the hidden states to vocabulary logits
-        logits = self.proj(hs)                                  # (B, T, V)
+        # 7) Output projection (weight tying optional)
+        if self.tie_weights:
+            # embed.embedding: (V, H) -> use E^T: (H, V)
+            logits = hs @ embed.embedding.T  # (B, T, V)
+        else:
+            W_out = self.param("W_out", nn.initializers.lecun_normal(), (H, self.vocab_size))
+            logits = hs @ W_out  # (B, T, V)
+
         return logits
