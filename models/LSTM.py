@@ -17,8 +17,8 @@ import flax.linen as nn
 
 class CharLSTM(nn.Module):
     vocab_size: int
-    hidden_size: int = 512
-    n_layers: int = 2
+    hidden_size: int = 256
+    n_layers: int = 4
     dropout: float = 0.1
     max_len: int = 128
     tie_weights: bool = False  # if True: use E^T for projection
