@@ -24,7 +24,6 @@ training:
   learning_rate: 0.0003
   epochs: 100000
   eval_interval: 500
-  eval_iters: 100
   warmup_iters: 2000
   stage_checkpoint_interval: 10000
   seed: 4212
