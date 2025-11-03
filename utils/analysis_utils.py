@@ -6,9 +6,9 @@ This module contains all performance analysis functions extracted from the origi
 import numpy as np
 import json
 
-
 def analyze_training_performance(
     loss_test_history,
+    loss_last_test_history,
     acc_test_history,
     acc_last_test_history,
     iteration_history,
@@ -24,6 +24,7 @@ def analyze_training_performance(
 
     # Convert to numpy arrays for easier computation
     loss_test_history = np.array(loss_test_history)
+    loss_last_test_history =  np.array(loss_last_test_history)
     acc_test_history = np.array(acc_test_history)
     acc_last_test_history = np.array(acc_last_test_history)
     iteration_history = np.array(iteration_history)
@@ -34,6 +35,14 @@ def analyze_training_performance(
     best_test_loss_iter = iteration_history[best_test_loss_idx]
 
     print(f"\nBest Test Loss:    {best_test_loss:.4f}  (at iteration {best_test_loss_iter:,})")
+
+    # === Best Test Last Character Loss ===
+    best_test_loss_last_idx = np.argmin(loss_last_test_history)
+    best_test_loss_last = loss_last_test_history[best_test_loss_last_idx]
+    best_test_loss_last_iter = iteration_history[best_test_loss_last_idx]
+
+    print(f"Best Last Char Loss:    {best_test_loss_last:.4f}  (at iteration {best_test_loss_last_iter:,})")
+
 
     # === Best Test Accuracy ===
     best_test_acc_idx = np.argmax(acc_test_history)
@@ -54,10 +63,12 @@ def analyze_training_performance(
 
     n_final = min(n_final, len(loss_test_history))
     final_loss = loss_test_history[-n_final:]
+    final_loss_last = loss_last_test_history[-n_final:]
     final_acc = acc_test_history[-n_final:]
     final_acc_last = acc_last_test_history[-n_final:]
 
     print(f"  Test Loss:       {final_loss.mean():.4f} ± {final_loss.std():.4f}")
+    print(f"  Last Char Loss:  {final_loss_last.mean():.4f} ± {final_loss_last.std():.4f}")
     print(f"  Test Accuracy:   {100*final_acc.mean():.2f}% ± {100*final_acc.std():.2f}%")
     print(f"  Last Char Acc:   {100*final_acc_last.mean():.2f}% ± {100*final_acc_last.std():.2f}%")
 
@@ -85,6 +96,8 @@ def analyze_training_performance(
         "best": {
             "test_loss": float(best_test_loss),
             "test_loss_iter": int(best_test_loss_iter),
+            "test_loss_last": float(best_test_loss_last),
+            "test_loss_last_iter": int(best_test_loss_last_iter),
             "test_acc": float(best_test_acc),
             "test_acc_iter": int(best_test_acc_iter),
             "test_acc_last": float(best_test_acc_last),
@@ -93,6 +106,8 @@ def analyze_training_performance(
         "final_avg": {
             "test_loss_mean": float(final_loss.mean()),
             "test_loss_std": float(final_loss.std()),
+            "test_loss_last_mean": float(final_loss_last.mean()),
+            "test_loss_last_std": float(final_loss_last.std()),
             "test_acc_mean": float(final_acc.mean()),
             "test_acc_std": float(final_acc.std()),
             "test_acc_last_mean": float(final_acc_last.mean()),
@@ -118,6 +133,8 @@ def analyze_training_performance(
 def get_summary_metrics(results):
     best_test_loss = results['best']['test_loss']
     best_test_loss_iter = results['best']['test_loss_iter']
+    best_test_loss_last = results['best']['test_loss_last']
+    best_test_loss_last_iter = results['best']['test_loss_last_iter']
     best_test_acc = results['best']['test_acc']
     best_test_acc_iter = results['best']['test_acc_iter']
     best_test_acc_last = results['best']['test_acc_last']
@@ -137,5 +154,5 @@ def get_summary_metrics(results):
     final_acc = np.full(n_final, final_acc_mean)
     final_acc_last = np.full(n_final, final_acc_last_mean)
 
-    return (best_test_loss, best_test_loss_iter, best_test_acc, best_test_acc_iter,
+    return (best_test_loss, best_test_loss_iter, best_test_loss_last, best_test_loss_last_iter, best_test_acc, best_test_acc_iter,
             best_test_acc_last, best_test_acc_last_iter, final_loss, final_acc, final_acc_last)
