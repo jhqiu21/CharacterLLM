@@ -187,6 +187,7 @@ checkpoints/
 *.pth
 *.json
 *.png
+runs/*
 
 # ==========================================
 # Miscellaneous tools
