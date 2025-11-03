@@ -6,6 +6,7 @@ This module contains all performance analysis functions extracted from the origi
 import numpy as np
 import json
 
+
 def analyze_training_performance(
     loss_test_history,
     loss_last_test_history,
@@ -24,7 +25,7 @@ def analyze_training_performance(
 
     # Convert to numpy arrays for easier computation
     loss_test_history = np.array(loss_test_history)
-    loss_last_test_history =  np.array(loss_last_test_history)
+    loss_last_test_history = np.array(loss_last_test_history)
     acc_test_history = np.array(acc_test_history)
     acc_last_test_history = np.array(acc_last_test_history)
     iteration_history = np.array(iteration_history)
@@ -42,7 +43,6 @@ def analyze_training_performance(
     best_test_loss_last_iter = iteration_history[best_test_loss_last_idx]
 
     print(f"Best Last Char Loss:    {best_test_loss_last:.4f}  (at iteration {best_test_loss_last_iter:,})")
-
 
     # === Best Test Accuracy ===
     best_test_acc_idx = np.argmax(acc_test_history)

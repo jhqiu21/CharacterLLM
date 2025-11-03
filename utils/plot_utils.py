@@ -17,7 +17,7 @@ def plot_training_curves(
     acc_test_history,
     acc_last_test_history,
     save_path='training_curves.pdf'
-):  
+):
     # Create a comprehensive figure with multiple subplots
     fig, axes = plt.subplots(3, 2, figsize=(9, 10))
 
@@ -50,7 +50,6 @@ def plot_training_curves(
     ax2.legend(loc='upper right')
     ax2.set_title("Training & Test Last Char Loss", fontsize=12, fontweight='bold')
     ax2.grid(alpha=0.3)
-
 
     # ===== Plot 3: Accuracy Curves =====
     ax3 = axes[1, 0]
