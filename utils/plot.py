@@ -16,10 +16,8 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     acc_test_history = metrics_logger.acc
     acc_last_test_history = metrics_logger.acc_last
 
-
     # Create a comprehensive figure with multiple subplots
     fig, axes = plt.subplots(3, 2, figsize=(9, 10))
-
 
     # ===== Plot 1: Loss Curves =====
     ax1 = axes[0, 0]
@@ -112,7 +110,6 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     print(f"\nFigure saved to '{save_path}'")
     plt.show()
-
 
     # ===== Plot 7: Empty (for layout symmetry) =====
     ax6 = axes[2, 1]

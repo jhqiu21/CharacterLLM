@@ -22,11 +22,9 @@ def analyze_training_performance(
     acc_last_test_history = metrics_logger.acc_last
     iteration_history = metrics_logger.iteration
 
-
     print("\n" + "=" * 60)
     print("PERFORMANCE ANALYSIS")
     print("=" * 60)
-    
 
     # Convert to numpy arrays for easier computation
     loss_test_history = np.array(loss_test_history)

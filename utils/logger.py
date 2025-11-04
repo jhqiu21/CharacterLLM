@@ -1,5 +1,4 @@
 # Logger utility for logging training and evaluation metrics
-import time
 
 
 class Logger:
@@ -22,12 +21,10 @@ class Logger:
         self.ece = []
         self.step = list(range(epoch))
 
-
     def log_train(self, metrics, lr):
         self.loss_weighted_train.append(metrics['loss_train'])
         self.loss_all_train.append(metrics['loss_all'])
         self.learning_rates.append(lr)
-    
 
     def log_eval(self, iteration: int, test_metrics):
         self.iteration.append(iteration)
@@ -39,7 +36,6 @@ class Logger:
         self.bpc.append(test_metrics['bpc'])
         self.pred_entropy.append(test_metrics['pred_entropy'])
         self.ece.append(test_metrics['ece'][0])
-
 
     def print_metrics(self, time_since_start):
         print("")
@@ -54,25 +50,22 @@ class Logger:
         print(f"\t \t bits-per-character: {self.bpc[-1]:.4f}")
         print(f"\t \t ECE: {self.ece[0]:.4f}")
         print(f"\t \t pred_entropy: {self.pred_entropy[-1]:.4f}")
-        
 
     def isBest(self, test_metrics):
         if not self.loss_all_val:
             # First evaluation is always the best
             return True, True, True, True
-        
+
         is_best_loss_all = test_metrics['loss_all'] <= min(self.loss_all_val, default=float('inf'))
         is_best_acc = test_metrics['acc'] >= max(self.acc, default=float('-inf'))
         is_best_acc_last = test_metrics['acc_last'] >= max(self.acc_last, default=float('-inf'))
         is_best_perplexity = test_metrics['perplexity'] <= min(self.perplexity, default=float('inf'))
         return is_best_loss_all, is_best_acc, is_best_acc_last, is_best_perplexity
 
-
     def __repr__(self):
         n_train = len(self.loss_weighted_train)
         n_eval = len(self.iteration)
         return f"Logger(train_steps={n_train}, eval_steps={n_eval})"
-    
 
     def get_metrics_history(self):
         return {

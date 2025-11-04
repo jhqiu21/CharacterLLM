@@ -62,44 +62,44 @@ def expected_calibration_error(logits, targets, n_bins=20):
 
     # Create bin edges
     bin_boundaries = jnp.linspace(0, 1, n_bins + 1)
-    
+
     # Assign each confidence to a bin
     # digitize returns bin indices in range [0, n_bins]
     # We use bins[1:-1] to get interior boundaries
     bin_indices = jnp.digitize(confidences, bin_boundaries[1:-1])
-    
+
     # Vectorized computation of bin statistics
     def compute_bin_stats(bin_idx):
         """Compute statistics for a single bin using pure JAX operations."""
         # Create mask for samples in this bin
         in_bin = (bin_indices == bin_idx).astype(jnp.float32)
         bin_size = jnp.sum(in_bin)
-        
+
         # Prevent division by zero: if bin is empty, use 1.0 as denominator
         # The contribution will be masked out anyway
         safe_bin_size = jnp.where(bin_size > 0, bin_size, 1.0)
-        
+
         # Average confidence and accuracy in this bin
         bin_confidence = jnp.sum(confidences * in_bin) / safe_bin_size
         bin_accuracy = jnp.sum(correct * in_bin) / safe_bin_size
-        
+
         # Contribution to ECE (weighted by proportion of samples in bin)
         weight = bin_size / confidences.shape[0]
         gap = jnp.abs(bin_confidence - bin_accuracy)
         contribution = weight * gap
-        
+
         # If bin is empty, set contribution to 0
         contribution = jnp.where(bin_size > 0, contribution, 0.0)
-        
+
         return contribution, bin_confidence, bin_accuracy, bin_size, gap
-    
+
     # Apply function to all bins using vmap
     bin_results = jax.vmap(compute_bin_stats)(jnp.arange(n_bins))
     contributions, bin_confidences, bin_accuracies, bin_sizes, gaps = bin_results
-    
+
     # Sum all contributions to get final ECE
     ece = jnp.sum(contributions)
-    
+
     # Prepare detailed calibration data
     # Note: This dict contains JAX arrays and is suitable for returning
     calibration_data = {
@@ -113,7 +113,7 @@ def expected_calibration_error(logits, targets, n_bins=20):
         'mean_confidence': jnp.mean(confidences),
         'mean_accuracy': jnp.mean(correct),
     }
-    
+
     return ece, calibration_data
 
 
