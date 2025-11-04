@@ -8,20 +8,25 @@ import json
 
 
 def analyze_training_performance(
-    loss_test_history,
-    loss_last_test_history,
-    acc_test_history,
-    acc_last_test_history,
-    iteration_history,
+    metrics_logger,
     total_time,
     niter,
     n_final=10,
     save_results=True,
     results_path='training_results.json'
 ):
+
+    loss_test_history = metrics_logger.loss_all_val
+    loss_last_test_history = metrics_logger.loss_last
+    acc_test_history = metrics_logger.acc
+    acc_last_test_history = metrics_logger.acc_last
+    iteration_history = metrics_logger.iteration
+
+
     print("\n" + "=" * 60)
     print("PERFORMANCE ANALYSIS")
     print("=" * 60)
+    
 
     # Convert to numpy arrays for easier computation
     loss_test_history = np.array(loss_test_history)
