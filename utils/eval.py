@@ -176,17 +176,51 @@ def confidence_distribution(logits, targets):
     }
 
 
-def token_frequency_analysis(logits, targets, token_counts):
+def token_frequency_analysis(logits, targets, token_counts, top_percent=0.2):
     """
     Analyze accuracy for common vs rare tokens.
     Args:
         logits: (B, T, V) array
         targets: (B, T) array
         token_counts: Array of shape (V,) with token frequencies in training data
+        top_percent: fraction of tokens considered 'common' or 'rare'
     Returns:
-        freq_stats: Dict with frequency-based statistics
+        freq_stats: Dict with frequency-based statistics (overall, common, and rare token accuracy)
     """
-    pass
+    # Step 1: Predictions and correctness
+    preds = jnp.argmax(logits, axis=-1)
+    correct = (preds == targets).astype(jnp.float32)
+    
+    # Step 2: Flatten batch and sequence dimensions
+    targets_flat = targets.flatten()
+    correct_flat = correct.flatten()
+    
+    # Step 3: Determine thresholds for common and rare tokens
+    V = token_counts.shape[0]
+    sorted_indices = jnp.argsort(token_counts)  # ascending: rare → common
+    n_top = max(1, int(V * top_percent))
+    
+    rare_tokens = sorted_indices[:n_top]
+    common_tokens = sorted_indices[-n_top:]
+    
+    # Step 4: Accuracy for rare tokens
+    rare_mask = jnp.isin(targets_flat, rare_tokens)
+    rare_acc = correct_flat[rare_mask].mean() if rare_mask.sum() > 0 else jnp.nan
+    
+    # Step 5: Accuracy for common tokens
+    common_mask = jnp.isin(targets_flat, common_tokens)
+    common_acc = correct_flat[common_mask].mean() if common_mask.sum() > 0 else jnp.nan
+    
+    # Step 6: Overall accuracy
+    overall_acc = correct_flat.mean()
+    
+    freq_stats = {
+        "overall_accuracy": float(overall_acc),
+        "common_accuracy": float(common_acc),
+        "rare_accuracy": float(rare_acc),
+    }
+    
+    return freq_stats
 
 
 def self_BLEU(generated_samples, n_gram=4):
