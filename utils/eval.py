@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 import optax
 
@@ -212,7 +213,6 @@ def distinct_n(tokens, n=2):
     Returns:
         distinct_score: Ratio of unique n-grams to total n-grams
     """
-    import numpy as np
 
     # flatten 2D list if needed
     if isinstance(tokens, np.ndarray) and tokens.ndim == 2:
