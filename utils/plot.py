@@ -21,7 +21,7 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
 
     # ===== Plot 1: Loss Curves =====
     ax1 = axes[0, 0]
-    ax1.plot(step_history, loss_all_history,'-', label='Train', color="blue", alpha=0.6)
+    ax1.plot(step_history[1], loss_all_history[1],'-', label='Train', color="blue", alpha=0.6)
     ax1.plot(iteration_history, loss_test_history, '-', label='Test', lw=2, color="red")
     # Mark best test loss
     best_idx = np.argmin(loss_test_history)

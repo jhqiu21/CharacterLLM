@@ -5,8 +5,9 @@ Utils package for transformer training.
 from .config import load_config, save_config, print_config
 from .plot import plot_training_curves
 from .analysis import analyze_training_performance, get_summary_metrics
-from .checkpoint_saver import save_collected_checkpoints
+from .checkpoint_saver import save_collected_checkpoints, load_checkpoint
 from .eval import perplexity, bits_per_character, accuracy, cross_entropy_last_token_only
+from .test import test_checkpoint
 
 __all__ = [
     'load_config',
@@ -20,4 +21,6 @@ __all__ = [
     'bits_per_character',
     'accuracy',
     'cross_entropy_last_token_only',
+    'test_checkpoint',
+    'load_checkpoint',
 ]

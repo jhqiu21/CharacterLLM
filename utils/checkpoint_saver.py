@@ -22,14 +22,14 @@ def save_collected_checkpoints(checkpoints_to_save, stage_dir, best_dir):
         print(f"\t Saved (loss: {ckpt_state['val_loss']:.4f})")
 
     # save best loss checkpoint
-    if checkpoints_to_save.get('best_loss') is not None:
+    if checkpoints_to_save.get('best_loss_all') is not None:
         step, ckpt_state = checkpoints_to_save['best_loss_all']
         print(f"\t Saving best loss checkpoint (step {step:,})...")
         checkpoints.save_checkpoint(
             ckpt_dir=str(best_dir),
             target=ckpt_state,
             step=step,
-            prefix='best_loss_',
+            prefix='best_loss_all_',
             keep=1,
             overwrite=True,
         )
@@ -78,3 +78,23 @@ def save_collected_checkpoints(checkpoints_to_save, stage_dir, best_dir):
         print(f"\t Saved (loss: {ckpt_state['val_loss']:.4f})")
 
     print("ALL CHECKPOINTS SAVED")
+
+
+
+def load_checkpoint(prefix, name, BEST_DIR, STAGE_DIR):
+    
+    if 'best' in prefix:
+        ckpt = checkpoints.restore_checkpoint(
+            ckpt_dir=str(BEST_DIR),
+            target=None,
+            prefix=prefix
+        )
+    
+    if 'stage' in prefix:
+        ckpt = checkpoints.restore_checkpoint(
+            ckpt_dir=str(STAGE_DIR),
+            target=None,
+            prefix=prefix
+        )
+    
+    return ckpt

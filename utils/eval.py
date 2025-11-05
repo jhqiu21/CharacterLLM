@@ -3,6 +3,14 @@ import jax.numpy as jnp
 
 import optax
 
+def loss_all(logits, targets):
+    vocab = logits.shape[-1]
+    flat_logits = logits.reshape(-1, vocab)
+    flat_targets = targets.reshape(-1)
+    per_pos = optax.softmax_cross_entropy_with_integer_labels(flat_logits, flat_targets)
+    loss = per_pos.mean()
+    return loss
+
 
 def perplexity(logits, targets):
     vocab_size = logits.shape[-1]
