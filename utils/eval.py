@@ -217,16 +217,12 @@ def distinct_n(tokens, n=2):
     pass
 
 
-
-
 def coherence_score(tokens, int_to_char):
     """
     Simple coherence metric based on valid English-like patterns.
-    
     Args:
         tokens: List of token IDs
         int_to_char: Mapping from token ID to character
-        
     Returns:
         coherence: Simple coherence score (0-1)
     """
@@ -236,11 +232,9 @@ def coherence_score(tokens, int_to_char):
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
     repeat_penlty = 1.0 / (1.0 + max_repeat / 10.0)
 
-
     words = text.split(' ')
 
     avg_word_len = np.mean([len(w) for w in words if w]) if any(w for w in words) else 0 
-
 
     word_len_score = 1.0 - abs(avg_word_len - 5.0) / 10.0
 
