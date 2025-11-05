@@ -230,11 +230,11 @@ def coherence_score(tokens, int_to_char):
     text = ''.join(int_to_char.get(int(t), '?') for t in tokens)
 
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
-    repeat_penlty = 1.0 / (1.0 + max_repeat / 10.0)
+    repeat_penalty = 1.0 / (1.0 + max_repeat / 10.0)
 
     words = text.split(' ')
 
-    avg_word_len = np.mean([len(w) for w in words if w]) if any(w for w in words) else 0 
+    avg_word_len = np.mean([len(w) for w in words if w]) if any(w for w in words) else 0
 
     word_len_score = 1.0 - abs(avg_word_len - 5.0) / 10.0
 
