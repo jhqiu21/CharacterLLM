@@ -80,21 +80,20 @@ def save_collected_checkpoints(checkpoints_to_save, stage_dir, best_dir):
     print("ALL CHECKPOINTS SAVED")
 
 
-
 def load_checkpoint(prefix, name, BEST_DIR, STAGE_DIR):
-    
+
     if 'best' in prefix:
         ckpt = checkpoints.restore_checkpoint(
             ckpt_dir=str(BEST_DIR),
             target=None,
             prefix=prefix
         )
-    
+
     if 'stage' in prefix:
         ckpt = checkpoints.restore_checkpoint(
             ckpt_dir=str(STAGE_DIR),
             target=None,
             prefix=prefix
         )
-    
+
     return ckpt

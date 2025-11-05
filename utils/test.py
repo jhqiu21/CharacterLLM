@@ -1,7 +1,7 @@
 from . import eval
-import jax
 import jax.numpy as jnp
 import numpy as np
+
 
 def test_checkpoint(model, param, test_data):
     data_length = len(test_data)
@@ -11,7 +11,7 @@ def test_checkpoint(model, param, test_data):
     num_batches = max(1, num_blocks // batch_size)
 
     total_loss = 0.0
-    total_tok  = 0
+    total_tok = 0
     correct_all = 0
     correct_last = 0
     total_seq = 0
@@ -37,12 +37,13 @@ def test_checkpoint(model, param, test_data):
     bpc = eval.bits_per_character(avg_loss)
     overall_acc = correct_all / total_tok
     last_char_acc = correct_last / total_seq
-    print(f"Test Set Evaluation:")
+    print("Test Set Evaluation:")
     print(f"\t \tPerplexity: {perplexity:.4f}")
     print(f"\t \tBits per Character: {bpc:.4f}")
     print(f"\t \tOverall Accuracy: {overall_acc*100:.2f}%")
     print(f"\t \tLast Character Accuracy: {last_char_acc*100:.2f}%")
     return perplexity, bpc, overall_acc, last_char_acc
+
 
 def get_batch_test(text_int, it, B, T):
     # get batch in order of size B x T
@@ -53,4 +54,3 @@ def get_batch_test(text_int, it, B, T):
     x = jnp.stack([text_int[s:s + T] for s in starts])
     y = jnp.stack([text_int[s + 1:s + 1 + T] for s in starts])
     return jnp.array(x, dtype=jnp.int32), jnp.array(y, dtype=jnp.int32)
-

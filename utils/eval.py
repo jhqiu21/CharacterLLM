@@ -3,6 +3,7 @@ import jax.numpy as jnp
 
 import optax
 
+
 def loss_all(logits, targets):
     vocab = logits.shape[-1]
     flat_logits = logits.reshape(-1, vocab)
