@@ -212,7 +212,22 @@ def distinct_n(tokens, n=2):
     Returns:
         distinct_score: Ratio of unique n-grams to total n-grams
     """
-    pass
+    import numpy as np
+
+    # flatten 2D list if needed
+    if isinstance(tokens, np.ndarray) and tokens.ndim == 2:
+        tokens = tokens.flatten()
+    elif isinstance(tokens[0], list) or isinstance(tokens[0], np.ndarray):
+        tokens = np.array(tokens).flatten()
+
+    # extract n-grams
+    n_grams = [tuple(tokens[i:i+n]) for i in range(len(tokens)-n+1)]
+    if len(n_grams) == 0:
+        return 0.0  # avoid division by zero
+
+    unique_n_grams = set(n_grams)
+    distinct_score = len(unique_n_grams) / len(n_grams)
+    return distinct_score
 
 
 def coherence_score(tokens, int_to_char):
