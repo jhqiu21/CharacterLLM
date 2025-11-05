@@ -219,7 +219,7 @@ def token_frequency_analysis(logits, targets, token_counts, top_percent=0.2):
         "common_accuracy": float(common_acc),
         "rare_accuracy": float(rare_acc),
     }
-    
+
     return freq_stats
 
 
