@@ -208,7 +208,7 @@ def self_bleu(
     n = len(texts)
     if n < 2:
         return 0.0
-    
+
     scores = []
     for i in range(n):
         cand = list(texts[i])
