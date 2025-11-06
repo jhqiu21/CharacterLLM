@@ -3,8 +3,9 @@ import jax.numpy as jnp
 
 import optax
 
-from typing import List, Sequence
+from typing import Sequence
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+
 
 def perplexity(logits, targets):
     vocab_size = logits.shape[-1]
@@ -202,7 +203,6 @@ def self_bleu(
     ref: list(list(str))
     cand: list(str)
     """
-
     weights = [(1.0 / n_grams) for _ in range(n_grams)]
 
     n = len(texts)
