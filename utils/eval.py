@@ -227,16 +227,16 @@ def coherence_score(tokens, int_to_char):
         coherence: Simple coherence score (0-1)
     """
 
+   # Constants for scoring
+    IDEAL_WORD_LENGTH = 5.0
+    WORD_LENGTH_RANGE = 10.0
+    REPEAT_PENALTY_SCALE = 10.0
     text = ''.join(int_to_char.get(int(t), '?') for t in tokens)
-
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
-    repeat_penalty = 1.0 / (1.0 + max_repeat / 10.0)
-
+    repeat_penalty = 1.0 / (1.0 + max_repeat / REPEAT_PENALTY_SCALE)
     words = text.split(' ')
-
     avg_word_len = np.mean([len(w) for w in words if w]) if any(w for w in words) else 0
-
-    word_len_score = 1.0 - abs(avg_word_len - 5.0) / 10.0
+    word_len_score = 1.0 - abs(avg_word_len - IDEAL_WORD_LENGTH) / WORD_LENGTH_RANGE
 
     word_len_score = np.clip(word_len_score, 0, 1)
 
