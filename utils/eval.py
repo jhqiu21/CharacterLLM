@@ -226,11 +226,10 @@ def coherence_score(tokens, int_to_char):
     Returns:
         coherence: Simple coherence score (0-1)
     """
-
-   # Constants for scoring
     IDEAL_WORD_LENGTH = 5.0
     WORD_LENGTH_RANGE = 10.0
     REPEAT_PENALTY_SCALE = 10.0
+
     text = ''.join(int_to_char.get(int(t), '?') for t in tokens)
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
     repeat_penalty = 1.0 / (1.0 + max_repeat / REPEAT_PENALTY_SCALE)
