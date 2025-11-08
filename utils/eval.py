@@ -3,7 +3,6 @@ import jax.numpy as jnp
 
 import optax
 import itertools
-import numpy as np
 
 
 def perplexity(logits, targets):
