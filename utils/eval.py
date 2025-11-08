@@ -9,6 +9,15 @@ from typing import Sequence
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 
+def loss_all(logits, targets):
+    vocab = logits.shape[-1]
+    flat_logits = logits.reshape(-1, vocab)
+    flat_targets = targets.reshape(-1)
+    per_pos = optax.softmax_cross_entropy_with_integer_labels(flat_logits, flat_targets)
+    loss = per_pos.mean()
+    return loss
+
+
 def perplexity(logits, targets):
     vocab_size = logits.shape[-1]
     flat_logits = logits.reshape(-1, vocab_size)
@@ -54,68 +63,69 @@ def cross_entropy_last_token_only(logits, targets):
     return jnp.mean(loss)
 
 
-def expected_calibration_error(logits, targets, n_bins=10):
-    """
-    Expected Calibration Error (ECE) measures how well-calibrated the model's confidence is.
-    Lower is better (0 = perfectly calibrated).
-    n_bins: Number of bins for calibration
-    Returns:
-        ece: Expected Calibration Error (scalar)
-        calibration_data: Dict with detailed calibration info
-    """
+def expected_calibration_error(logits, targets, n_bins=20):
     probs = jax.nn.softmax(logits, axis=-1)
     max_probs = jnp.max(probs, axis=-1)
     predictions = jnp.argmax(probs, axis=-1)
 
-    # Flatten
+    # Flatten all arrays
     confidences = max_probs.reshape(-1)
     predictions_flat = predictions.reshape(-1)
     targets_flat = targets.reshape(-1)
     correct = (predictions_flat == targets_flat).astype(jnp.float32)
 
-    # Bin edges
+    # Create bin edges
     bin_boundaries = jnp.linspace(0, 1, n_bins + 1)
 
-    # Calculate ECE
-    ece = 0.0
-    bin_data = []
+    # Assign each confidence to a bin
+    # digitize returns bin indices in range [0, n_bins]
+    # We use bins[1:-1] to get interior boundaries
+    bin_indices = jnp.digitize(confidences, bin_boundaries[1:-1])
 
-    for i in range(n_bins):
-        # Find samples in this bin
-        lower = bin_boundaries[i]
-        upper = bin_boundaries[i + 1]
-
-        if i == n_bins - 1:  # Last bin includes right boundary
-            in_bin = (confidences >= lower) & (confidences <= upper)
-        else:
-            in_bin = (confidences >= lower) & (confidences < upper)
-
+    # Vectorized computation of bin statistics
+    def compute_bin_stats(bin_idx):
+        """Compute statistics for a single bin using pure JAX operations."""
+        # Create mask for samples in this bin
+        in_bin = (bin_indices == bin_idx).astype(jnp.float32)
         bin_size = jnp.sum(in_bin)
 
-        # Skip empty bins
-        if bin_size > 0:
-            # Average confidence in bin
-            bin_confidence = jnp.sum(confidences * in_bin) / bin_size
+        # Prevent division by zero: if bin is empty, use 1.0 as denominator
+        # The contribution will be masked out anyway
+        safe_bin_size = jnp.where(bin_size > 0, bin_size, 1.0)
 
-            # Average accuracy in bin
-            bin_accuracy = jnp.sum(correct * in_bin) / bin_size
+        # Average confidence and accuracy in this bin
+        bin_confidence = jnp.sum(confidences * in_bin) / safe_bin_size
+        bin_accuracy = jnp.sum(correct * in_bin) / safe_bin_size
 
-            # Weighted contribution to ECE
-            ece += (bin_size / len(confidences)) * jnp.abs(bin_confidence - bin_accuracy)
+        # Contribution to ECE (weighted by proportion of samples in bin)
+        weight = bin_size / confidences.shape[0]
+        gap = jnp.abs(bin_confidence - bin_accuracy)
+        contribution = weight * gap
 
-            bin_data.append({
-                'confidence': float(bin_confidence),
-                'accuracy': float(bin_accuracy),
-                'count': int(bin_size),
-                'gap': float(jnp.abs(bin_confidence - bin_accuracy))
-            })
+        # If bin is empty, set contribution to 0
+        contribution = jnp.where(bin_size > 0, contribution, 0.0)
 
+        return contribution, bin_confidence, bin_accuracy, bin_size, gap
+
+    # Apply function to all bins using vmap
+    bin_results = jax.vmap(compute_bin_stats)(jnp.arange(n_bins))
+    contributions, bin_confidences, bin_accuracies, bin_sizes, gaps = bin_results
+
+    # Sum all contributions to get final ECE
+    ece = jnp.sum(contributions)
+
+    # Prepare detailed calibration data
+    # Note: This dict contains JAX arrays and is suitable for returning
     calibration_data = {
-        'ece': float(ece),
+        'ece': ece,  # Keep as JAX array for now
         'n_bins': n_bins,
-        'bins': bin_data,
-        'mean_confidence': float(jnp.mean(confidences)),
-        'mean_accuracy': float(jnp.mean(correct)),
+        'bin_confidences': bin_confidences,
+        'bin_accuracies': bin_accuracies,
+        'bin_sizes': bin_sizes,
+        'bin_gaps': gaps,
+        'bin_edges': bin_boundaries,
+        'mean_confidence': jnp.mean(confidences),
+        'mean_accuracy': jnp.mean(correct),
     }
 
     return ece, calibration_data
@@ -172,12 +182,12 @@ def confidence_distribution(logits, targets):
     incorrect_conf = jnp.sum(top1_conf * incorrect_mask) / jnp.sum(incorrect_mask)
 
     return {
-        'mean_confidence': float(jnp.mean(top1_conf)),
-        'median_confidence': float(jnp.median(top1_conf)),
-        'mean_top5_confidence': float(jnp.mean(top5_conf)),
-        'correct_confidence': float(correct_conf),
-        'incorrect_confidence': float(incorrect_conf),
-        'confidence_gap': float(correct_conf - incorrect_conf),
+        'mean_confidence': jnp.mean(top1_conf),
+        'median_confidence': jnp.median(top1_conf),
+        'mean_top5_confidence': jnp.mean(top5_conf),
+        'correct_confidence': correct_conf,
+        'incorrect_confidence': incorrect_conf,
+        'confidence_gap': correct_conf - incorrect_conf,
     }
 
 

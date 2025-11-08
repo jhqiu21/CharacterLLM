@@ -7,27 +7,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_training_curves(
-    time_history,
-    loss_history,
-    time_test_history,
-    loss_test_history,
-    loss_last_test_history,
-    iteration_history,
-    acc_test_history,
-    acc_last_test_history,
-    save_path='training_curves.pdf'
-):
+def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
+    step_history = metrics_logger.step
+    iteration_history = metrics_logger.iteration
+    loss_all_history = metrics_logger.loss_all_train
+    loss_test_history = metrics_logger.loss_all_val
+    loss_last_test_history = metrics_logger.loss_last
+    acc_test_history = metrics_logger.acc
+    acc_last_test_history = metrics_logger.acc_last
+
     # Create a comprehensive figure with multiple subplots
     fig, axes = plt.subplots(3, 2, figsize=(9, 10))
 
     # ===== Plot 1: Loss Curves =====
     ax1 = axes[0, 0]
-    ax1.plot(time_history, loss_history, '-', label='Train', color="blue", alpha=0.6)
-    ax1.plot(time_test_history, loss_test_history, '-', label='Test', lw=2, color="red")
+    ax1.plot(step_history[1], loss_all_history[1],'-', label='Train', color="blue", alpha=0.6)
+    ax1.plot(iteration_history, loss_test_history, '-', label='Test', lw=2, color="red")
     # Mark best test loss
     best_idx = np.argmin(loss_test_history)
-    ax1.scatter(time_test_history[best_idx], loss_test_history[best_idx],
+    ax1.scatter(iteration_history[best_idx], loss_test_history[best_idx],
                s=100, color='red', marker='*', zorder=5,
                label=f'Best: {loss_test_history[best_idx]:.4f}')
     ax1.set_xlabel("Time (seconds)", fontsize=11)
@@ -38,11 +36,10 @@ def plot_training_curves(
 
     # ===== Plot 2: Last Char. Loss Curves =====
     ax2 = axes[0, 1]
-    ax2.plot(time_history, loss_history, '-', label='Train', color="blue", alpha=0.6)
-    ax2.plot(time_test_history, loss_last_test_history, '-', label='Test', lw=2, color="red")
+    ax2.plot(iteration_history, loss_last_test_history, '-', label='Test', lw=2, color="red")
     # Mark best test loss
     best_idx = np.argmin(loss_last_test_history)
-    ax2.scatter(time_test_history[best_idx], loss_last_test_history[best_idx],
+    ax2.scatter(iteration_history[best_idx], loss_last_test_history[best_idx],
                s=100, color='red', marker='*', zorder=5,
                label=f'Best: {loss_last_test_history[best_idx]:.4f}')
     ax2.set_xlabel("Time (seconds)", fontsize=11)
@@ -113,3 +110,7 @@ def plot_training_curves(
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     print(f"\nFigure saved to '{save_path}'")
     plt.show()
+
+    # ===== Plot 7: Empty (for layout symmetry) =====
+    ax6 = axes[2, 1]
+    ax6.axis('off')  # Hide the empty subplot
