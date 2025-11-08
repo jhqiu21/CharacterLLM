@@ -5,6 +5,9 @@ import numpy as np
 import optax
 import itertools
 
+from typing import Sequence
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+
 
 def perplexity(logits, targets):
     vocab_size = logits.shape[-1]
@@ -225,17 +228,34 @@ def token_frequency_analysis(logits, targets, token_counts, top_percent=0.2):
     return freq_stats
 
 
-def self_BLEU(generated_samples, n_gram=4):
+def self_bleu(
+    texts: Sequence[Sequence[str]],
+    n_grams: int = 4) -> float:
     """
-    Calculate Self-BLEU score to measure diversity between samples.
-    Lower is better (more diverse samples).
-    Args:
-        generated_samples: List of token sequences
-        n_gram: Maximum n-gram size for BLEU
-    Returns:
-        self_bleu: Average BLEU score between each sample and others
+    texts: list of tokenized sentences, e.g., [['this','is','a','test'], ...]
+    weights: BLEU n-gram weights (default BLEU-4)
+    smoothing: apply NLTK smoothing (method3 is common)
+
+    ref: list(list(str))
+    cand: list(str)
     """
-    pass
+    weights = [(1.0 / n_grams) for _ in range(n_grams)]
+
+    n = len(texts)
+    if n < 2:
+        return 0.0
+
+    scores = []
+    for i in range(n):
+        cand = list(texts[i])
+        refs = [list(texts[j]) for j in range(n) if j != i]
+        if not refs:
+            continue
+        smoothie = SmoothingFunction().method3
+        score = sentence_bleu(refs, cand, weights=weights, smoothing_function=smoothie)
+        scores.append(score)
+
+    return sum(scores) / len(scores)
 
 
 def distinct_n(tokens, n=2):
