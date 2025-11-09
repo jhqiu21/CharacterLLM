@@ -191,48 +191,48 @@ def confidence_distribution(logits, targets):
     }
 
 
-def token_frequency_analysis(logits, targets, token_counts, top_percent=0.2):
+def token_frequency_analysis(logits, targets, top_percent=0.2):
     """
-    Analyze accuracy for common vs rare tokens.
+    Analyze accuracy for common vs rare tokens in a JAX-compatible way.
     Args:
         logits: (B, T, V) array
         targets: (B, T) array
-        token_counts: Array of shape (V,) with token frequencies in training data
         top_percent: fraction of tokens considered 'common' or 'rare'
     Returns:
         freq_stats: Dict with frequency-based statistics (overall, common, and rare token accuracy)
     """
+    B, T, V = logits.shape
+
     # Step 1: Predictions and correctness
     preds = jnp.argmax(logits, axis=-1)
     correct = (preds == targets).astype(jnp.float32)
 
     # Step 2: Flatten batch and sequence dimensions
-    targets_flat = targets.flatten()
-    correct_flat = correct.flatten()
+    targets_flat = targets.reshape(-1)
+    correct_flat = correct.reshape(-1)
 
-    # Step 3: Determine thresholds for common and rare tokens
-    V = token_counts.shape[0]
-    sorted_indices = jnp.argsort(token_counts)  # ascending: rare → common
+    # Step 3: Compute token counts
+    token_counts = jnp.sum(jax.nn.one_hot(targets_flat, V), axis=0)
+
+    # Step 4: Determine thresholds for common and rare tokens
     n_top = max(1, int(V * top_percent))
-
+    sorted_indices = jnp.argsort(token_counts)  # ascending: rare → common
     rare_tokens = sorted_indices[:n_top]
     common_tokens = sorted_indices[-n_top:]
 
-    # Step 4: Accuracy for rare tokens
-    rare_mask = jnp.isin(targets_flat, rare_tokens)
-    rare_acc = correct_flat[rare_mask].mean() if rare_mask.sum() > 0 else jnp.nan
+    # Step 5: Masks for rare and common tokens
+    rare_mask = jnp.isin(targets_flat, rare_tokens).astype(jnp.float32)
+    common_mask = jnp.isin(targets_flat, common_tokens).astype(jnp.float32)
 
-    # Step 5: Accuracy for common tokens
-    common_mask = jnp.isin(targets_flat, common_tokens)
-    common_acc = correct_flat[common_mask].mean() if common_mask.sum() > 0 else jnp.nan
-
-    # Step 6: Overall accuracy
-    overall_acc = correct_flat.mean()
+    # Step 6: Compute accuracies using mask multiplication
+    rare_acc = jnp.sum(correct_flat * rare_mask) / (jnp.sum(rare_mask) + 1e-8)
+    common_acc = jnp.sum(correct_flat * common_mask) / (jnp.sum(common_mask) + 1e-8)
+    overall_acc = jnp.mean(correct_flat)
 
     freq_stats = {
-        "overall_accuracy": float(overall_acc),
-        "common_accuracy": float(common_acc),
-        "rare_accuracy": float(rare_acc),
+        "overall_accuracy": overall_acc,
+        "common_accuracy": common_acc,
+        "rare_accuracy": rare_acc,
     }
 
     return freq_stats
@@ -270,28 +270,30 @@ def self_bleu(
 
 def distinct_n(tokens, n=2):
     """
-    Calculate Distinct-N metric for generated text.
-    Measures vocabulary diversity. Higher is better.
+    JAX-compatible Distinct-N without using jnp.unique or Python set.
     Args:
-        tokens: List or array of token IDs
-        n: N-gram size (1, 2, or 4 typically)
+        tokens: (B, T) array
+        n: n-gram size
     Returns:
-        distinct_score: Ratio of unique n-grams to total n-grams
+        distinct_score: ratio of unique n-grams to total n-grams
     """
+    tokens_flat = tokens.reshape(-1)
+    num_ngrams = len(tokens_flat) - n + 1
+    if num_ngrams <= 0:
+        return 0.0
 
-    # flatten 2D list if needed
-    if isinstance(tokens, np.ndarray) and tokens.ndim == 2:
-        tokens = tokens.flatten()
-    elif isinstance(tokens[0], list) or isinstance(tokens[0], np.ndarray):
-        tokens = np.array(tokens).flatten()
+    # Build all n-grams as integer hashes
+    n_grams = jnp.stack([tokens_flat[i:i+num_ngrams] for i in range(n)], axis=1)
+    base = tokens_flat.max() + 1
+    hashes = jnp.sum(n_grams * (base ** jnp.arange(n)), axis=1)
 
-    # extract n-grams
-    n_grams = [tuple(tokens[i:i+n]) for i in range(len(tokens)-n+1)]
-    if len(n_grams) == 0:
-        return 0.0  # avoid division by zero
+    # Count unique hashes without using unique()
+    # Trick: sort + diff to find unique
+    sorted_hashes = jnp.sort(hashes)
+    diffs = jnp.diff(sorted_hashes)
+    num_unique = jnp.sum(diffs != 0) + 1  # first one always counts
 
-    unique_n_grams = set(n_grams)
-    distinct_score = len(unique_n_grams) / len(n_grams)
+    distinct_score = num_unique / num_ngrams
     return distinct_score
 
 
