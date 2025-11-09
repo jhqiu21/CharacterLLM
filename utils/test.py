@@ -39,7 +39,7 @@ def test_checkpoint(model, param, test_data):
         rare_acc_total += freq_stats_batch["rare_accuracy"] * B_eff * T
         common_acc_total += freq_stats_batch["common_accuracy"] * B_eff * T
         pred_tokens = jnp.argmax(test_logits, axis=-1)
-        distinct_total += eval.distinct_n(pred_tokens) * B_eff # can change parameter n in eval.py
+        distinct_total += eval.distinct_n(pred_tokens) * B_eff  # can change parameter n in eval.py
     print("Finished evaluation on test set...")
     avg_loss = total_loss / total_tok
     perplexity = np.exp(avg_loss)
