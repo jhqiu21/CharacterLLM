@@ -5,7 +5,6 @@ import numpy as np
 import optax
 import itertools
 
-from typing import Sequence
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import generation
 
@@ -244,15 +243,15 @@ def self_bleu(
     config,
     int_to_char: dict,
     char_to_int: dict,
-    char_set, 
+    char_set,
     params,
-    prompt: str,    
+    prompt: str,
     gen_len: int,
     temperature: float,
     sample: bool,
     seed: int,
-    n_grams: int = 4,
-    n_samples: int = 20) -> float:
+    n_grams: int=4,
+    n_samples: int=20) -> float:
     """
     model, config, int_to_char, char_to_int, char_set: defined else where in the cells before
     params: defined in the loop
