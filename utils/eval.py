@@ -7,6 +7,7 @@ import itertools
 
 from typing import Sequence
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+import generation
 
 
 def loss_all(logits, targets):
@@ -239,16 +240,47 @@ def token_frequency_analysis(logits, targets, token_counts, top_percent=0.2):
 
 
 def self_bleu(
-    texts: Sequence[Sequence[str]],
-    n_grams: int = 4) -> float:
+    model,
+    config,
+    int_to_char: dict,
+    char_to_int: dict,
+    char_set, 
+    params,
+    prompt: str,    
+    gen_len: int,
+    temperature: float,
+    sample: bool,
+    seed: int,
+    n_grams: int = 4,
+    n_samples: int = 20) -> float:
     """
-    texts: list of tokenized sentences, e.g., [['this','is','a','test'], ...]
-    weights: BLEU n-gram weights (default BLEU-4)
-    smoothing: apply NLTK smoothing (method3 is common)
+    model, config, int_to_char, char_to_int, char_set: defined else where in the cells before
+    params: defined in the loop
+    prompt, gen_len, temperature, sample, seed: defined at the start of the evaluation cell
+    n_grams: number of grams for self-BLEU (default: 4)
+    n_samples: number of samples to generate for self-BLEU (default: 20)
+    """
+    # Generate continuations
+    rng_base = jax.random.PRNGKey(seed)
+    prompt_int = jnp.array(
+        [[char_to_int.get(c, len(char_set)) for c in prompt.lower()[:config.model.max_len]]],
+        dtype=jnp.int32
+    )
+    keys = jax.random.split(rng_base, n_samples)
 
-    ref: list(list(str))
-    cand: list(str)
-    """
+    continuations = []
+    for k in keys:
+        out_ids_i = generation.generate_tokens(
+            model, params, k, prompt_int, gen_len,
+            block_size=config.model.max_len,
+            temperature=temperature,
+            sample=sample
+        )
+        cont_i = ''.join(int_to_char.get(int(x), '?') for x in list(out_ids_i[0])).strip()
+        continuations.append(cont_i)
+    texts = [c.split() for c in continuations]
+
+    # Compute self-BLEU score
     weights = [(1.0 / n_grams) for _ in range(n_grams)]
 
     n = len(texts)
@@ -265,7 +297,9 @@ def self_bleu(
         score = sentence_bleu(refs, cand, weights=weights, smoothing_function=smoothie)
         scores.append(score)
 
-    return sum(scores) / len(scores)
+    self_sb = sum(scores) / len(scores)
+    print(f"\t \tSelf-BLEU-{n_grams}: {self_sb:.4f}")
+    return self_sb
 
 
 def distinct_n(tokens, n=2):
