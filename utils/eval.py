@@ -250,8 +250,8 @@ def self_bleu(
     temperature: float,
     sample: bool,
     seed: int,
-    n_grams: int=4,
-    n_samples: int=20) -> float:
+    n_grams: int = 4,
+    n_samples: int = 20) -> float:
     """
     model, config, int_to_char, char_to_int, char_set: defined else where in the cells before
     params: defined in the loop
