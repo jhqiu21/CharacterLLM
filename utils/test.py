@@ -17,16 +17,12 @@ def coherence_score(tokens, int_to_char):
     WORD_LENGTH_RANGE = 10.0
     REPEAT_PENALTY_SCALE = 10.0
 
-    # 将 tokens 转换为文本
     text = ''.join(int_to_char.get(int(t), '?') for t in tokens)
     
-    # Repeat Penalty (基于最长连续重复字符序列)
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
     repeat_penalty = 1.0 / (1.0 + max_repeat / REPEAT_PENALTY_SCALE)
     
-    # Word Length Score (基于平均单词长度)
     words = text.split(' ')
-    # 确保只计算非空词的长度
     avg_word_len = np.mean([len(w) for w in words if w]) if any(w for w in words) else 0
     word_len_score = 1.0 - abs(avg_word_len - IDEAL_WORD_LENGTH) / WORD_LENGTH_RANGE
 
@@ -35,6 +31,7 @@ def coherence_score(tokens, int_to_char):
     coherence = (repeat_penalty + word_len_score) / 2.0
 
     return float(coherence)
+
 
 def test_checkpoint(model, param, test_data):
     data_length = len(test_data)
