@@ -18,10 +18,10 @@ def coherence_score(tokens, int_to_char):
     REPEAT_PENALTY_SCALE = 10.0
 
     text = ''.join(int_to_char.get(int(t), '?') for t in tokens)
-    
+
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
     repeat_penalty = 1.0 / (1.0 + max_repeat / REPEAT_PENALTY_SCALE)
-    
+
     words = text.split(' ')
     avg_word_len = np.mean([len(w) for w in words if w]) if any(w for w in words) else 0
     word_len_score = 1.0 - abs(avg_word_len - IDEAL_WORD_LENGTH) / WORD_LENGTH_RANGE
