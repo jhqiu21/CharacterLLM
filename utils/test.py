@@ -37,7 +37,7 @@ def test_checkpoint(model, param, test_data):
         total_seq += B_eff
         pred_tokens = jnp.argmax(test_logits, axis=-1)
         coherence_total += eval.coherence_score(pred_tokens) * B_eff
-        
+
     print("Finished evaluation on test set...")
     avg_loss = total_loss / total_tok
     perplexity = np.exp(avg_loss)
