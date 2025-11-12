@@ -60,8 +60,6 @@ def test_checkpoint(model, param, test_data):
     print(f"\t \tDistinct-N: {avg_distinct:.4f}")
     return perplexity, bpc, overall_acc, last_char_acc, avg_rare_acc, avg_common_acc, avg_distinct, coherence
 
-
-
 def get_batch_test(text_int, it, B, T):
     # get batch in order of size B x T
     starts = np.arange(it * B, (it + 1) * B) * T
