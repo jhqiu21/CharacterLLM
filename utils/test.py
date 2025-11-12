@@ -35,7 +35,11 @@ def test_checkpoint(model, param, test_data):
         correct_all += acc_all.item() * B_eff * T
         correct_last += acc_last.item() * B_eff
         total_seq += B_eff
+        freq_stats_batch = eval.token_frequency_analysis(test_logits, test_targets)  # can change parameter top_percent in eval.py
+        rare_acc_total += freq_stats_batch["rare_accuracy"] * B_eff * T
+        common_acc_total += freq_stats_batch["common_accuracy"] * B_eff * T
         pred_tokens = jnp.argmax(test_logits, axis=-1)
+        distinct_total += eval.distinct_n(pred_tokens) * B_eff  # can change parameter n in eval.py
         coherence_total += eval.coherence_score(pred_tokens) * B_eff
 
     print("Finished evaluation on test set...")
