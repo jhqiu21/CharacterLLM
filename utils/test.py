@@ -1,7 +1,6 @@
 from . import eval
 import jax.numpy as jnp
 import numpy as np
-import itertools
 
 
 def test_checkpoint(model, param, test_data):
@@ -39,12 +38,6 @@ def test_checkpoint(model, param, test_data):
         pred_tokens = jnp.argmax(test_logits, axis=-1)
         coherence_total += eval.coherence_score(pred_tokens) * B_eff
         
-
-        freq_stats_batch = eval.token_frequency_analysis(test_logits, test_targets)  # can change parameter top_percent in eval.py
-        rare_acc_total += freq_stats_batch["rare_accuracy"] * B_eff * T
-        common_acc_total += freq_stats_batch["common_accuracy"] * B_eff * T
-        pred_tokens = jnp.argmax(test_logits, axis=-1)
-        distinct_total += eval.distinct_n(pred_tokens) * B_eff  # can change parameter n in eval.py
     print("Finished evaluation on test set...")
     avg_loss = total_loss / total_tok
     perplexity = np.exp(avg_loss)
@@ -78,4 +71,3 @@ def get_batch_test(text_int, it, B, T):
     x = jnp.stack([text_int[s:s + T] for s in starts])
     y = jnp.stack([text_int[s + 1:s + 1 + T] for s in starts])
     return jnp.array(x, dtype=jnp.int32), jnp.array(y, dtype=jnp.int32)
-
