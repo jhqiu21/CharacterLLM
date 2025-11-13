@@ -301,11 +301,12 @@ def token_frequency_analysis(logits, targets, top_percent=0.2):
     return self_sb
 # 修改 utils/eval.py'''
 
+
 def self_bleu(
     model,
     config,
-    decode_fn, # <--- 接收解码函数
-    encode_fn, # <--- 接收编码函数
+    decode_fn,   # <--- 接收解码函数
+    encode_fn,   # <--- 接收编码函数
     params,
     prompt: str,
     gen_len: int,
@@ -318,8 +319,8 @@ def self_bleu(
     Computes Self-BLEU score using external encode/decode functions 
     to support both Char-level and Subword modes.
     """
-    # 编码 Prompt
-    prompt_ids = encode_fn(prompt.lower())
+    
+    prompt_ids = encode_fn(prompt.lower())# 编码 Prompt
     prompt_int = jnp.array(
         [prompt_ids[:config.model.max_len]], # 截断 context 长度
         dtype=jnp.int32
