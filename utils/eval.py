@@ -238,7 +238,7 @@ def token_frequency_analysis(logits, targets, top_percent=0.2):
     return freq_stats
 
 
-def self_bleu(
+'''def self_bleu(
     model,
     config,
     int_to_char: dict,
@@ -299,7 +299,69 @@ def self_bleu(
     self_sb = sum(scores) / len(scores)
     print(f"\t \tSelf-BLEU-{n_grams}: {self_sb:.4f}")
     return self_sb
+# 修改 utils/eval.py'''
 
+def self_bleu(
+    model,
+    config,
+    decode_fn, # <--- 接收解码函数
+    encode_fn, # <--- 接收编码函数
+    params,
+    prompt: str,
+    gen_len: int,
+    temperature: float,
+    sample: bool,
+    seed: int,
+    n_grams: int = 4,
+    n_samples: int = 20) -> float:
+    """
+    Computes Self-BLEU score using external encode/decode functions 
+    to support both Char-level and Subword modes.
+    """
+    # 编码 Prompt
+    prompt_ids = encode_fn(prompt.lower())
+    prompt_int = jnp.array(
+        [prompt_ids[:config.model.max_len]], # 截断 context 长度
+        dtype=jnp.int32
+    )
+    
+    rng_base = jax.random.PRNGKey(seed)
+    keys = jax.random.split(rng_base, n_samples)
+    continuations = []
+
+    for k in keys:
+        out_ids_i = generate_tokens(
+            model, params, k, prompt_int, gen_len,
+            block_size=config.model.max_len,
+            temperature=temperature,
+            sample=sample
+        )
+        # 核心修改：使用传入的 decode_fn
+        cont_i = decode_fn(out_ids_i[0]).strip()
+        continuations.append(cont_i)
+        
+    texts = [c.split() for c in continuations]
+
+    # Compute self-BLEU score (以下逻辑与原代码保持不变)
+    weights = [(1.0 / n_grams) for _ in range(n_grams)]
+
+    n = len(texts)
+    if n < 2:
+        return 0.0
+
+    scores = []
+    for i in range(n):
+        cand = list(texts[i])
+        refs = [list(texts[j]) for j in range(n) if j != i]
+        if not refs:
+            continue
+        smoothie = SmoothingFunction().method3
+        score = sentence_bleu(refs, cand, weights=weights, smoothing_function=smoothie)
+        scores.append(score)
+
+    self_sb = sum(scores) / len(scores)
+    print(f"\t \tSelf-BLEU-{n_grams}: {self_sb:.4f}")
+    return self_sb
 
 def distinct_n(tokens, n=2):
     """
@@ -330,7 +392,7 @@ def distinct_n(tokens, n=2):
     return distinct_score
 
 
-def coherence_score(tokens, int_to_char):
+'''def coherence_score(tokens, int_to_char):
     """
     Simple coherence metric based on valid English-like patterns.
     Args:
@@ -344,6 +406,35 @@ def coherence_score(tokens, int_to_char):
     REPEAT_PENALTY_SCALE = 10.0
 
     text = ''.join(int_to_char.get(int(t), '?') for t in tokens)
+    max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
+    repeat_penalty = 1.0 / (1.0 + max_repeat / REPEAT_PENALTY_SCALE)
+    words = text.split(' ')
+    avg_word_len = np.mean([len(w) for w in words if w]) if any(w for w in words) else 0
+    word_len_score = 1.0 - abs(avg_word_len - IDEAL_WORD_LENGTH) / WORD_LENGTH_RANGE
+
+    word_len_score = np.clip(word_len_score, 0, 1)
+
+    coherence = (repeat_penalty + word_len_score) / 2.0
+
+    return float(coherence)
+# 修改 utils/eval.py'''
+
+def coherence_score(tokens, decode_fn): # <--- 接收 decode_fn
+    """
+    Simple coherence metric based on valid English-like patterns.
+    Args:
+        tokens: List of token IDs (JAX array or list)
+        decode_fn: Function to convert token IDs to string
+    Returns:
+        coherence: Simple coherence score (0-1)
+    """
+    IDEAL_WORD_LENGTH = 5.0
+    WORD_LENGTH_RANGE = 10.0
+    REPEAT_PENALTY_SCALE = 10.0
+
+    # 核心修改：使用传入的 decode_fn
+    text = decode_fn(tokens)
+    
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
     repeat_penalty = 1.0 / (1.0 + max_repeat / REPEAT_PENALTY_SCALE)
     words = text.split(' ')
