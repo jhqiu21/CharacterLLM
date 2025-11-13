@@ -2,7 +2,7 @@ from . import eval
 import jax.numpy as jnp
 import numpy as np
 
-
+# FIXME: Fix bug in correctness of test metrics calculation
 def test_checkpoint(model, param, test_data):
     data_length = len(test_data)
     batch_size = 1024
