@@ -8,6 +8,7 @@ from .analysis import analyze_training_performance, get_summary_metrics
 from .checkpoint_saver import save_collected_checkpoints, load_checkpoint
 from .eval import perplexity, bits_per_character, accuracy, cross_entropy_last_token_only
 from .test import test_checkpoint
+#from .generation import generate_tokens
 
 __all__ = [
     'load_config',
@@ -23,4 +24,5 @@ __all__ = [
     'cross_entropy_last_token_only',
     'test_checkpoint',
     'load_checkpoint',
+    #'generate_tokens'
 ]
