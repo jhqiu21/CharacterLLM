@@ -34,15 +34,18 @@ class MLP(nn.Module):
         """
 
         d_model: int
-        mlp_ratio: int = 4
+        mlp_dropout: float
+        mlp_ratio: int
 
         @nn.compact
-        def __call__(self, x):
+        def __call__(self, x, *, deterministic: bool):
                 # Expand channel dimension (D -> hidden), apply non-linearity, project back to D.
                 hidden = int(self.d_model * self.mlp_ratio)
                 x = nn.Dense(hidden)(x)
                 x = nn.gelu(x)
                 x = nn.Dense(self.d_model)(x)
+                # Post-MLP dropout (before residual add)
+                x = nn.Dropout(rate=self.mlp_dropout)(x, deterministic=deterministic)
                 return x
 
 
@@ -62,21 +65,30 @@ class DecoderBlock(nn.Module):
 
     d_model: int
     n_heads: int
-    mlp_ratio: int = 4
+    mlp_dropout: float
+    attn_dropout: float       # attention weights dropout
+    resid_dropout: float      # post-attention/MLP dropout
+    mlp_ratio: int
 
     @nn.compact
-    def __call__(self, x, *, mask=None):
+    def __call__(self, x, *, mask=None, deterministic: bool):
         # Attention sublayer: Pre-LayerNorm -> Self-Attention -> Residual add
         h = nn.LayerNorm()(x)
         h = nn.SelfAttention(
             num_heads=self.n_heads,
             use_bias=False,
-        )(h, mask=mask)
+            dropout_rate=self.attn_dropout,
+        )(h, mask=mask, deterministic=deterministic)
+        h = nn.Dropout(rate=self.resid_dropout)(h, deterministic=deterministic)
         x = x + h  # residual connection
 
         # MLP sublayer: Pre-LayerNorm -> MLP -> Residual add
         h = nn.LayerNorm()(x)
-        h = MLP(self.d_model, mlp_ratio=self.mlp_ratio)(h)
+        h = MLP(self.d_model,
+                mlp_ratio=self.mlp_ratio,
+                mlp_dropout=self.mlp_dropout,
+        )(h, deterministic=deterministic)
+
         x = x + h  # residual connection
         return x
 
@@ -107,7 +119,12 @@ class DecoderOnlyTransformer(nn.Module):
     n_layers: int
     n_heads: int
     max_len: int
-    mlp_ratio: int = 4
+    mlp_ratio: int
+
+    emb_dropout: float        # embedding dropout
+    mlp_dropout: float       # MLP dropout
+    attn_dropout: float       # attention weights dropout
+    resid_dropout: float      # post-attention/MLP dropout
 
     def setup(self):
         # Token embedding table E with shape (V, D)
@@ -122,7 +139,16 @@ class DecoderOnlyTransformer(nn.Module):
         )
 
         # Stack of decoder blocks
-        self.blocks = [DecoderBlock(d_model=self.d_model, n_heads=self.n_heads, mlp_ratio=self.mlp_ratio) for _ in range(self.n_layers)]
+        self.blocks = [
+            DecoderBlock(
+                  d_model=self.d_model,
+                  n_heads=self.n_heads,
+                  mlp_ratio=self.mlp_ratio,
+                  mlp_dropout=self.mlp_dropout,
+                  attn_dropout=self.attn_dropout,
+                  resid_dropout=self.resid_dropout,
+            ) for _ in range(self.n_layers)
+        ]
 
         # Final LayerNorm before projecting to logits
         self.layerNorm_final = nn.LayerNorm()
@@ -130,7 +156,8 @@ class DecoderOnlyTransformer(nn.Module):
         # Optional separate output head if not weight-tying
         self.project_to_vocab = nn.Dense(self.vocab_size, use_bias=False)
 
-    def __call__(self, idx):
+    @nn.compact
+    def __call__(self, idx, *, deterministic: bool):
         """Forward pass (causal-only).
 
         Args:
@@ -144,13 +171,16 @@ class DecoderOnlyTransformer(nn.Module):
         # Token + positional embeddings -> (B, T, D)
         x = self.tok_embed(idx) + self.positional_embed[:T]
 
+        # Embedding dropout
+        x = nn.Dropout(rate=self.emb_dropout)(x, deterministic=deterministic)
+
         # Build attention mask: strictly causal (lower-triangular), no padding mask.
         causal = attn.make_causal_mask(jnp.ones((B, T), dtype=bool))
         mask = causal
 
         # Run the stack of decoder blocks
         for blk in self.blocks:
-            x = blk(x, mask=mask)
+            x = blk(x, mask=mask, deterministic=deterministic)
 
         # Final LayerNorm before output projection
         x = self.layerNorm_final(x)

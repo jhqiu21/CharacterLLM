@@ -41,6 +41,7 @@ def generate_tokens(model, params, rng, context, length, block_size=64, temperat
         rng, ctx = carry  # rng: PRNGKey, ctx: (B, block_size)
         # forward pass: get logits for all positions, take last position
         logits = model.apply({"params": params}, ctx, train=False)  # (B, block_size, V)
+
         last_logits = logits[:, -1, :]  # (B, V)
         rng, subkey = jax.random.split(rng)
         if sample:
