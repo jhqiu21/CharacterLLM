@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def test_checkpoint(model, param, test_data):
+def test_checkpoint(model, param, test_data, int_to_char):
     data_length = len(test_data)
     batch_size = 1024
     sequence_length = 32
@@ -38,9 +38,14 @@ def test_checkpoint(model, param, test_data):
         freq_stats_batch = eval.token_frequency_analysis(test_logits, test_targets)  # can change parameter top_percent in eval.py
         rare_acc_total += freq_stats_batch["rare_accuracy"] * B_eff * T
         common_acc_total += freq_stats_batch["common_accuracy"] * B_eff * T
+
         pred_tokens = jnp.argmax(test_logits, axis=-1)
-        distinct_total += eval.distinct_n(pred_tokens) * B_eff  # can change parameter n in eval.py
-        coherence_total += eval.coherence_score(pred_tokens) * B_eff
+
+        distinct_total += float(eval.distinct_n(pred_tokens)) * B_eff  # can change parameter n in eval.py
+
+        pred_np = np.array(pred_tokens)
+        batch_coherences = [eval.coherence_score(seq, int_to_char) for seq in pred_np]
+        coherence_total += sum(batch_coherences)
 
     print("Finished evaluation on test set...")
     avg_loss = total_loss / total_tok
