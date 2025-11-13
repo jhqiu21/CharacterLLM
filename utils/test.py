@@ -2,6 +2,7 @@ from . import eval
 import jax.numpy as jnp
 import numpy as np
 
+
 def test_checkpoint(model, param, test_data, int_to_char):
     data_length = len(test_data)
     batch_size = 1024
