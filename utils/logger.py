@@ -7,7 +7,6 @@ class Logger:
         # Training metrics
         self.loss_all_train = []
         self.loss_weighted_train = []
-        self.learning_rates = []
         # Evaluation loss metrics
         self.loss_all_val = []
         self.loss_last = []
@@ -21,10 +20,9 @@ class Logger:
         self.ece = []
         self.step = list(range(epoch))
 
-    def log_train(self, metrics, lr):
+    def log_train(self, metrics):
         self.loss_weighted_train.append(metrics['loss_train'])
         self.loss_all_train.append(metrics['loss_all'])
-        self.learning_rates.append(lr)
 
     def log_eval(self, iteration: int, test_metrics):
         self.iteration.append(iteration)
@@ -40,7 +38,6 @@ class Logger:
     def print_metrics(self, time_since_start):
         print("")
         print(f"iteration {self.iteration[-1]}  time: {time_since_start:.1f} seconds")
-        print(f"\t \t learning rate: {self.learning_rates[-1]:.6f}")
         print(f"\t \t loss (weighted train): {self.loss_weighted_train[-1]:.4f}")
         print(f"\t \t loss (train :: test): {self.loss_all_train[-1]:.4f} :: {self.loss_all_val[-1]:.4f}")
         print(f"\t \t loss (last character): {self.loss_last[-1]:.4f}")
@@ -73,7 +70,6 @@ class Logger:
             'iteration': self.iteration,
             'loss_all_train': self.loss_all_train,
             'loss_weighted_train': self.loss_weighted_train,
-            'learning_rates': self.learning_rates,
             'loss_all_val': self.loss_all_val,
             'loss_last': self.loss_last,
             'acc': self.acc,

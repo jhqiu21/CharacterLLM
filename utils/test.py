@@ -25,7 +25,7 @@ def test_checkpoint(model, param, test_data):
         if test_batch is None:
             break
         test_inputs, test_targets = test_batch
-        test_logits = model.apply({'params': param}, test_inputs, deterministic=True)
+        test_logits = model.apply({'params': param}, test_inputs, train=False)
 
         B_eff, T = test_inputs.shape
         loss_all = eval.loss_all(test_logits, test_targets)
