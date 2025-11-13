@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import numpy as np
 
 
+# FIXME: coherence_score
 def test_checkpoint(model, param, test_data):
     data_length = len(test_data)
     batch_size = 1024
