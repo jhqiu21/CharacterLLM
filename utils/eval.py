@@ -6,7 +6,7 @@ import optax
 import itertools
 
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
-import generation
+from .generation import generate_tokens
 
 
 def loss_all(logits, targets):
@@ -269,7 +269,7 @@ def self_bleu(
 
     continuations = []
     for k in keys:
-        out_ids_i = generation.generate_tokens(
+        out_ids_i = generate_tokens(
             model, params, k, prompt_int, gen_len,
             block_size=config.model.max_len,
             temperature=temperature,
