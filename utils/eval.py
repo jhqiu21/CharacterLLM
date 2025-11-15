@@ -319,13 +319,13 @@ def self_bleu(
     Computes Self-BLEU score using external encode/decode functions 
     to support both Char-level and Subword modes.
     """
-    
-    prompt_ids = encode_fn(prompt.lower())# 编码 Prompt
+
+    prompt_ids = encode_fn(prompt.lower())  # 编码 Prompt
     prompt_int = jnp.array(
-        [prompt_ids[:config.model.max_len]], # 截断 context 长度
+        [prompt_ids[:config.model.max_len]],  # 截断 context 长度
         dtype=jnp.int32
     )
-    
+
     rng_base = jax.random.PRNGKey(seed)
     keys = jax.random.split(rng_base, n_samples)
     continuations = []
@@ -340,7 +340,7 @@ def self_bleu(
         # 核心修改：使用传入的 decode_fn
         cont_i = decode_fn(out_ids_i[0]).strip()
         continuations.append(cont_i)
-        
+
     texts = [c.split() for c in continuations]
 
     # Compute self-BLEU score (以下逻辑与原代码保持不变)
@@ -363,6 +363,7 @@ def self_bleu(
     self_sb = sum(scores) / len(scores)
     print(f"\t \tSelf-BLEU-{n_grams}: {self_sb:.4f}")
     return self_sb
+
 
 def distinct_n(tokens, n=2):
     """
@@ -420,7 +421,8 @@ def distinct_n(tokens, n=2):
     return float(coherence)
 # 修改 utils/eval.py'''
 
-def coherence_score(tokens, decode_fn): # <--- 接收 decode_fn
+
+def coherence_score(tokens, decode_fn):  # <--- 接收 decode_fn
     """
     Simple coherence metric based on valid English-like patterns.
     Args:
@@ -435,7 +437,7 @@ def coherence_score(tokens, decode_fn): # <--- 接收 decode_fn
 
     # 核心修改：使用传入的 decode_fn
     text = decode_fn(tokens)
-    
+
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
     repeat_penalty = 1.0 / (1.0 + max_repeat / REPEAT_PENALTY_SCALE)
     words = text.split(' ')
