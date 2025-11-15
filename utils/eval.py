@@ -314,8 +314,11 @@ def self_bleu(
     sample: bool,
     seed: int,
     n_grams: int = 4,
-    n_samples: int = 20) -> float: 
-
+    n_samples: int = 20) -> float:
+    """
+    Computes Self-BLEU score using external encode/decode functions
+    to support both Char-level and Subword modes.
+    """
     prompt_ids = encode_fn(prompt.lower())  # 编码 Prompt
     prompt_int = jnp.array(
         [prompt_ids[:config.model.max_len]],  # 截断 context 长度
