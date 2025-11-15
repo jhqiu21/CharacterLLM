@@ -314,11 +314,7 @@ def self_bleu(
     sample: bool,
     seed: int,
     n_grams: int = 4,
-    n_samples: int = 20) -> float:
-    """
-    Computes Self-BLEU score using external encode/decode functions 
-    to support both Char-level and Subword modes.
-    """
+    n_samples: int = 20) -> float: 
 
     prompt_ids = encode_fn(prompt.lower())  # 编码 Prompt
     prompt_int = jnp.array(
