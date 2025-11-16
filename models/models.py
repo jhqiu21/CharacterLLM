@@ -1,11 +1,5 @@
 """
-Minimal decoder-only Transformer blocks in Flax/JAX, commented for learning.
-
-The model mirrors a GPT-style architecture:
-- Token embeddings + learned positional embeddings
-- Stack of Pre-LayerNorm decoder blocks with causal self-attention
-- Final LayerNorm
-- Weight tying between input embeddings and output logits projection
+Decoder-only Transformer blocks in Flax/JAX, commented for learning.
 
 Tensor shape conventions used below:
 - B: batch size
@@ -15,8 +9,15 @@ Tensor shape conventions used below:
 """
 
 import flax.linen as nn
+import jax
 import jax.numpy as jnp
 from flax.linen import attention as attn
+from .positional_encodings import (
+    SinusoidalPositionalEncoding,
+    RotaryPositionalEmbedding,
+    ALiBiPositionalBias,
+    HybridPositionalEncoding
+)
 
 
 class MLP(nn.Module):
@@ -49,8 +50,111 @@ class MLP(nn.Module):
                 return x
 
 
+class MultiHeadAttentionWithPE(nn.Module):
+    """Multi-head attention with support for various positional encodings.
+
+    This is a custom implementation that allows:
+    - RoPE to be applied to Q and K
+    - ALiBi/Relative biases to be added to attention scores
+    """
+
+    d_model: int
+    n_heads: int
+    attn_dropout: float
+    pos_encoding_type: str
+    max_len: int
+
+    def setup(self):
+        self.head_dim = self.d_model // self.n_heads
+        assert self.d_model % self.n_heads == 0, "d_model must be divisible by n_heads"
+
+        # Q, K, V projections
+        self.q_proj = nn.Dense(self.d_model, use_bias=False)
+        self.k_proj = nn.Dense(self.d_model, use_bias=False)
+        self.v_proj = nn.Dense(self.d_model, use_bias=False)
+        self.out_proj = nn.Dense(self.d_model, use_bias=False)
+
+        # Position encoding specific modules
+        if self.pos_encoding_type == 'rope':
+            self.rope = RotaryPositionalEmbedding(
+                head_dim=self.head_dim,
+                max_len=self.max_len
+            )
+        elif self.pos_encoding_type == 'alibi':
+            self.alibi = ALiBiPositionalBias(
+                n_heads=self.n_heads,
+                max_len=self.max_len
+            )
+
+    @nn.compact
+    def __call__(self, x, *, mask=None, deterministic: bool):
+        """
+        Args:
+            x: Input of shape (B, T, D)
+            mask: Attention mask (B, 1, T, T) or (1, 1, T, T)
+            deterministic: Whether to apply dropout
+
+        Returns:
+            Output of shape (B, T, D)
+        """
+        B, T, D = x.shape
+
+        # Project to Q, K, V
+        q = self.q_proj(x)  # (B, T, D)
+        k = self.k_proj(x)  # (B, T, D)
+        v = self.v_proj(x)  # (B, T, D)
+
+        # Reshape to multi-head format: (B, T, H, d)
+        q = q.reshape(B, T, self.n_heads, self.head_dim)
+        k = k.reshape(B, T, self.n_heads, self.head_dim)
+        v = v.reshape(B, T, self.n_heads, self.head_dim)
+
+        # Apply RoPE if specified
+        if self.pos_encoding_type == 'rope':
+            q, k = self.rope(q, k)
+
+        # Transpose to (B, H, T, d) for attention computation
+        q = q.transpose(0, 2, 1, 3)
+        k = k.transpose(0, 2, 1, 3)
+        v = v.transpose(0, 2, 1, 3)
+
+        # Compute attention scores: (B, H, T, T)
+        scale = 1.0 / jnp.sqrt(self.head_dim)
+        attn_scores = jnp.einsum('bhqd,bhkd->bhqk', q, k) * scale
+
+        # Add positional biases if using ALiBi
+        if self.pos_encoding_type == 'alibi':
+            alibi_bias = self.alibi(T)  # (H, T, T)
+            attn_scores = attn_scores + alibi_bias[None, :, :, :]  # (B, H, T, T)
+
+        # Apply causal mask
+        if mask is not None:
+            if mask.shape[1] == 1:
+                mask = jnp.broadcast_to(mask, (B, self.n_heads, T, T))
+            attn_scores = jnp.where(mask, attn_scores, -1e10)
+
+        # Softmax
+        attn_weights = jax.nn.softmax(attn_scores, axis=-1)
+
+        # Dropout on attention weights
+        attn_weights = nn.Dropout(rate=self.attn_dropout)(
+            attn_weights, deterministic=deterministic
+        )
+
+        # Apply attention to values: (B, H, T, d)
+        attn_out = jnp.einsum('bhqk,bhkd->bhqd', attn_weights, v)
+
+        # Reshape back: (B, T, D)
+        attn_out = attn_out.transpose(0, 2, 1, 3).reshape(B, T, D)
+
+        # Output projection
+        out = self.out_proj(attn_out)
+
+        return out
+
+
 class DecoderBlock(nn.Module):
-    """A single decoder block (Pre-LayerNorm + Self-Attn + MLP + residuals).
+    """A single decoder block.
 
     Pre-LayerNorm improves training stability. Residual connections are used after
     attention and MLP sublayers. The attention is causal when a causal mask is passed
@@ -66,19 +170,32 @@ class DecoderBlock(nn.Module):
     d_model: int
     n_heads: int
     mlp_dropout: float
-    attn_dropout: float       # attention weights dropout
-    resid_dropout: float      # post-attention/MLP dropout
+    attn_dropout: float
+    resid_dropout: float
     mlp_ratio: int
+    pos_encoding_type: str
+    max_len: int
 
     @nn.compact
     def __call__(self, x, *, mask=None, deterministic: bool):
-        # Attention sublayer: Pre-LayerNorm -> Self-Attention -> Residual add
         h = nn.LayerNorm()(x)
-        h = nn.SelfAttention(
-            num_heads=self.n_heads,
-            use_bias=False,
-            dropout_rate=self.attn_dropout,
-        )(h, mask=mask, deterministic=deterministic)
+
+        if self.pos_encoding_type in ['rope', 'alibi']:
+            h = MultiHeadAttentionWithPE(
+                d_model=self.d_model,
+                n_heads=self.n_heads,
+                attn_dropout=self.attn_dropout,
+                pos_encoding_type=self.pos_encoding_type,
+                max_len=self.max_len
+            )(h, mask=mask, deterministic=deterministic)
+        else:
+            # default SelfAttention for sinusoidal, hybrid
+            h = nn.SelfAttention(
+                num_heads=self.n_heads,
+                use_bias=False,
+                dropout_rate=self.attn_dropout,
+            )(h, mask=mask, deterministic=deterministic)
+
         h = nn.Dropout(rate=self.resid_dropout)(h, deterministic=deterministic)
         x = x + h  # residual connection
 
@@ -88,8 +205,8 @@ class DecoderBlock(nn.Module):
                 mlp_ratio=self.mlp_ratio,
                 mlp_dropout=self.mlp_dropout,
         )(h, deterministic=deterministic)
-
         x = x + h  # residual connection
+
         return x
 
 
@@ -122,21 +239,39 @@ class DecoderOnlyTransformer(nn.Module):
     mlp_ratio: int
 
     emb_dropout: float        # embedding dropout
-    mlp_dropout: float       # MLP dropout
+    mlp_dropout: float        # MLP dropout
     attn_dropout: float       # attention weights dropout
     resid_dropout: float      # post-attention/MLP dropout
+    pos_encoding_type: str    # positional encoding type: 'learned', 'sinusoidal', 'hybrid', 'rope', 'alibi'
 
     def setup(self):
         # Token embedding table E with shape (V, D)
         self.tok_embed = nn.Embed(self.vocab_size, self.d_model)
 
-        # Learned positional embeddings P with shape (max_len, D)
-        # We'll slice P[:T] each forward pass and add to token embeddings.
-        self.positional_embed = self.param(
-            "positional_embed",
-            nn.initializers.normal(stddev=0.02),
-            (self.max_len, self.d_model)
-        )
+        self.pos_encoding = None
+
+        if self.pos_encoding_type == 'learned':
+            # Learned positional embeddings (baseline)
+            self.positional_embed = self.param(
+                "positional_embed",
+                nn.initializers.normal(stddev=0.02),
+                (self.max_len, self.d_model)
+            )
+        elif self.pos_encoding_type == 'sinusoidal':
+            self.pos_encoding = SinusoidalPositionalEncoding(
+                d_model=self.d_model,
+                max_len=self.max_len
+            )
+        elif self.pos_encoding_type == 'hybrid':
+            self.pos_encoding = HybridPositionalEncoding(
+                d_model=self.d_model,
+                max_len=self.max_len
+            )
+        elif self.pos_encoding_type in ['rope', 'alibi']:
+            # These are handled within attention mechanism
+            self.pos_encoding = None
+        else:
+            raise ValueError(f"Unknown pos_encoding_type: {self.pos_encoding_type}")
 
         # Stack of decoder blocks
         self.blocks = [
@@ -147,6 +282,8 @@ class DecoderOnlyTransformer(nn.Module):
                   mlp_dropout=self.mlp_dropout,
                   attn_dropout=self.attn_dropout,
                   resid_dropout=self.resid_dropout,
+                  pos_encoding_type=self.pos_encoding_type,
+                  max_len=self.max_len
             ) for _ in range(self.n_layers)
         ]
 
@@ -168,8 +305,12 @@ class DecoderOnlyTransformer(nn.Module):
         """
         B, T = idx.shape
 
-        # Token + positional embeddings -> (B, T, D)
-        x = self.tok_embed(idx) + self.positional_embed[:T]
+        # Token embeddings
+        x = self.tok_embed(idx)
+        if self.pos_encoding_type == 'learned':
+            x = x + self.positional_embed[:T]
+        elif self.pos_encoding_type in ['sinusoidal', 'hybrid']:
+            x = self.pos_encoding(x)
 
         # Embedding dropout
         x = nn.Dropout(rate=self.emb_dropout)(x, deterministic=deterministic)
