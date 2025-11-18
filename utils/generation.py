@@ -62,7 +62,7 @@ def generate_tokens(model, params, rng, context, length, block_size=64, temperat
         return tokens
 
     assert B == 1, "ngram_size is currently implemented only for batch size 1"
-    
+
     # history = prompt tokens only (no padding)
     history = list(map(int, context[0].tolist()))
 
