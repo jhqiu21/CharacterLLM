@@ -6,6 +6,7 @@ class Logger:
         self.iteration = []
         # Training metrics
         self.loss_all_train = []
+        self.loss_last_train = []
         self.loss_weighted_train = []
         self.learning_rates = []
         # Evaluation loss metrics
@@ -24,6 +25,7 @@ class Logger:
     def log_train(self, metrics, lr):
         self.loss_weighted_train.append(metrics['loss_train'])
         self.loss_all_train.append(metrics['loss_all'])
+        self.loss_last_train.append(metrics['loss_last'])
         self.learning_rates.append(lr)
 
     def log_eval(self, iteration: int, test_metrics):
