@@ -1,5 +1,6 @@
 # CharacterLLM
 
+
 A character-level language modeling project implementing Transformer and LSTM baselines for next-character prediction on the text8 dataset. This project explores various architectural choices, positional encodings, and training strategies to achieve publication-quality results.
 
 ## Table of Contents
