@@ -11,7 +11,8 @@ model:
   mlp_dropout: 0.1
   attn_dropout: 0.1
   resid_dropout: 0.1
-  pos_encoding_type: 'rope'
+  # position encoding type: 'sinusoidal', 'learned', 'hybrid', 'rope', 'alibi', 'relative'
+  pos_encoding_type: 'learned'
 
 loss:
   LABEL_SMOOTHING: True
