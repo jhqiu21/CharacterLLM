@@ -241,8 +241,8 @@ def token_frequency_analysis(logits, targets, top_percent=0.2):
 def self_bleu(
     model,
     config,
-    decode_fn,   
-    encode_fn,   
+    decode_fn,
+    encode_fn,
     params,
     prompt: str,
     gen_len: int,
@@ -272,13 +272,12 @@ def self_bleu(
             temperature=temperature,
             sample=sample
         )
-        # 核心修改：使用传入的 decode_fn
+
         cont_i = decode_fn(out_ids_i[0]).strip()
         continuations.append(cont_i)
 
     texts = [c.split() for c in continuations]
 
-    # Compute self-BLEU score (以下逻辑与原代码保持不变)
     weights = [(1.0 / n_grams) for _ in range(n_grams)]
 
     n = len(texts)
@@ -329,7 +328,7 @@ def distinct_n(tokens, n=2):
     return distinct_score
 
 
-def coherence_score(tokens, decode_fn):  
+def coherence_score(tokens, decode_fn):
     """
     Simple coherence metric based on valid English-like patterns.
     Args:
@@ -342,7 +341,6 @@ def coherence_score(tokens, decode_fn):
     WORD_LENGTH_RANGE = 10.0
     REPEAT_PENALTY_SCALE = 10.0
 
-    
     text = decode_fn(tokens)
 
     max_repeat = max((len(list(g)) for k, g in itertools.groupby(text)), default=0)
