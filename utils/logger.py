@@ -6,6 +6,7 @@ class Logger:
         self.iteration = []
         # Training metrics
         self.loss_all_train = []
+        self.loss_last_train = []
         self.loss_weighted_train = []
         # Evaluation loss metrics
         self.loss_all_val = []
@@ -23,6 +24,7 @@ class Logger:
     def log_train(self, metrics):
         self.loss_weighted_train.append(metrics['loss_train'])
         self.loss_all_train.append(metrics['loss_all'])
+        self.loss_last_train.append(metrics['loss_last'])
 
     def log_eval(self, iteration: int, test_metrics):
         self.iteration.append(iteration)
@@ -51,13 +53,12 @@ class Logger:
     def isBest(self, test_metrics):
         if not self.loss_all_val:
             # First evaluation is always the best
-            return True, True, True, True
+            return True, True, True
 
         is_best_loss_all = test_metrics['loss_all'] <= min(self.loss_all_val, default=float('inf'))
         is_best_acc = test_metrics['acc'] >= max(self.acc, default=float('-inf'))
         is_best_acc_last = test_metrics['acc_last'] >= max(self.acc_last, default=float('-inf'))
-        is_best_perplexity = test_metrics['perplexity'] <= min(self.perplexity, default=float('inf'))
-        return is_best_loss_all, is_best_acc, is_best_acc_last, is_best_perplexity
+        return is_best_loss_all, is_best_acc, is_best_acc_last
 
     def __repr__(self):
         n_train = len(self.loss_weighted_train)
