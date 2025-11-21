@@ -168,6 +168,27 @@ class HybridPositionalEncoding(nn.Module):
         return x + combined
 
 
+"""Relative Positional Encoding"""
+
+
+class RelativePositionalEncoding(nn.Module):
+    """
+    Returns a matrix of shape (n_heads, 2*max_len-1)
+    """
+    n_heads: int
+    max_len: int
+
+    def setup(self):
+        self.rel_embed = self.param(
+            "rel_embed",
+            nn.initializers.zeros,
+            (self.n_heads, 2 * self.max_len - 1),
+        )
+
+    def __call__(self):
+        return self.rel_embed
+
+
 def get_positional_encoding(pe_type, d_model, max_len, n_heads=None):
     if pe_type == 'learned':
         # default positional embedding in baseline model
@@ -181,5 +202,7 @@ def get_positional_encoding(pe_type, d_model, max_len, n_heads=None):
         return ALiBiPositionalBias(n_heads=n_heads, max_len=max_len)
     elif pe_type == 'hybrid':
         return HybridPositionalEncoding(d_model=d_model, max_len=max_len)
+    elif pe_type == 'relative':
+        return RelativePositionalEncoding(d_model=d_model, max_len=max_len)
     else:
         raise ValueError(f"Unknown positional encoding type: {pe_type}")
