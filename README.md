@@ -97,7 +97,7 @@ The **text8** dataset contains the first 100 million characters from a cleaned E
 
 - **Vocabulary size**: 27 tokens (26 letters + space)
 - **Training set**: ~90M characters
-- **Validation set**: ~5M characters  
+- **Validation set**: ~5M characters
 - **Test set**: ~5M characters
 
 ## Run & Develop
