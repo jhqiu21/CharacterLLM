@@ -60,7 +60,8 @@ conda deactivate
 │   └── baseline.yaml          # Default transformer configuration
 │
 ├── models/                     # Core model implementations
-│   ├── models.py              # Transformer architecture
+│   ├── models.py              # Transformer architecture (main branch)
+│   ├── LSTM.py                # LSTM architecture (LSTM-baseline branch)
 │   └── positional_encodings.py # Various positional encoding methods
 │
 ├── utils/                      # Training and evaluation utilities
@@ -100,6 +101,8 @@ The **text8** dataset contains the first 100 million characters from a cleaned E
 
 ## Key Training Parameters
 
+**Transformer-specific parameters (`main` branch):**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `max_len` | Sequence length (context window) | 128 |
@@ -110,6 +113,19 @@ The **text8** dataset contains the first 100 million characters from a cleaned E
 | `learning_rate` | Peak learning rate | 0.0003 |
 | `batch_size` | Training batch size | 128 |
 | `epochs` | Total training iterations | 5000 |
+
+**LSTM-specific parameters (`LSTM-baseline` branch):**
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `hidden_size` | LSTM hidden dimension | 256 |
+| `n_layers` | Number of stacked LSTM layers | 4 |
+| `dropout` | Variational dropout rate | 0.1 |
+| `tie_weights` | Share embedding/output weights | True |
+| `max_len` | Sequence length | 128 |
+
+*Note: Training parameters (learning rate, batch size, epochs) are shared across branches.
+
 
 ## Configuration System
 
