@@ -128,7 +128,7 @@ def analyze_training_performance(
     if save_results:
         with open(results_path, 'w') as f:
             json.dump(results, f, indent=2)
-        print(f"\n✓ Results saved to '{results_path}'")
+        print(f"\nResults saved to '{results_path}'")
 
     return results
 
