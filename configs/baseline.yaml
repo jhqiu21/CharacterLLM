@@ -3,7 +3,6 @@ model_name: LSTM-baseline
 model:
   vocab_size: 27
   hidden_size: 256
-  n_heads: 4
   n_layers: 4
   max_len: 128
   dropout: 0.1
@@ -24,8 +23,8 @@ scheduler:
 training:
   batch_size: 128
   sequence_length: 128
-  learning_rate: 0.0003
-  epochs: 5000
+  learning_rate: 0.0004
+  epochs: 10000
   validation_interval: 500
   stage_checkpoint_interval: 10000
   seed: 4212
