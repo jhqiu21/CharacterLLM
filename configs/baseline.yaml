@@ -2,7 +2,7 @@ model_name: LSTM-baseline
 
 model:
   vocab_size: 27
-  d_model: 256
+  hidden_size: 256
   n_heads: 4
   n_layers: 4
   max_len: 128
