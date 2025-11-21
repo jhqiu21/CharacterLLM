@@ -16,7 +16,8 @@ from .positional_encodings import (
     SinusoidalPositionalEncoding,
     RotaryPositionalEmbedding,
     ALiBiPositionalBias,
-    HybridPositionalEncoding
+    HybridPositionalEncoding,
+    RelativePositionalEncoding
 )
 
 
@@ -75,7 +76,12 @@ class MultiHeadAttentionWithPE(nn.Module):
         self.out_proj = nn.Dense(self.d_model, use_bias=False)
 
         # Position encoding specific modules
-        if self.pos_encoding_type == 'rope':
+        if self.pos_encoding_type == "relative":
+            self.rel_bias = RelativePositionalEncoding(
+                n_heads=self.n_heads,
+                max_len=self.max_len
+            )
+        elif self.pos_encoding_type == 'rope':
             self.rope = RotaryPositionalEmbedding(
                 head_dim=self.head_dim,
                 max_len=self.max_len
@@ -122,10 +128,16 @@ class MultiHeadAttentionWithPE(nn.Module):
         scale = 1.0 / jnp.sqrt(self.head_dim)
         attn_scores = jnp.einsum('bhqd,bhkd->bhqk', q, k) * scale
 
-        # Add positional biases if using ALiBi
+        # Add positional biases if using ALiBi or Relative
         if self.pos_encoding_type == 'alibi':
             alibi_bias = self.alibi(T)  # (H, T, T)
             attn_scores = attn_scores + alibi_bias[None, :, :, :]  # (B, H, T, T)
+        elif self.pos_encoding_type == 'relative':
+            pos = jnp.arange(T)
+            rel_idx = pos[:, None] - pos[None, :] + (self.max_len - 1)  # (T, T)
+            bias_matrix = self.rel_bias()  # call the module to get (H, 2*max_len-1)
+            bias = bias_matrix[:, rel_idx]  # (H, T, T)
+            attn_scores = attn_scores + bias[None, :, :, :]  # (B, H, T, T)
 
         # Apply causal mask
         if mask is not None:
@@ -180,7 +192,7 @@ class DecoderBlock(nn.Module):
     def __call__(self, x, *, mask=None, deterministic: bool):
         h = nn.LayerNorm()(x)
 
-        if self.pos_encoding_type in ['rope', 'alibi']:
+        if self.pos_encoding_type in ['rope', 'alibi', 'relative']:
             h = MultiHeadAttentionWithPE(
                 d_model=self.d_model,
                 n_heads=self.n_heads,
@@ -267,7 +279,7 @@ class DecoderOnlyTransformer(nn.Module):
                 d_model=self.d_model,
                 max_len=self.max_len
             )
-        elif self.pos_encoding_type in ['rope', 'alibi']:
+        elif self.pos_encoding_type in ['rope', 'alibi', 'relative']:
             # These are handled within attention mechanism
             self.pos_encoding = None
         else:
