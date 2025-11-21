@@ -11,6 +11,7 @@ model:
   mlp_dropout: 0.1
   attn_dropout: 0.1
   resid_dropout: 0.1
+  pos_encoding_type: 'rope'
 
 loss:
   LABEL_SMOOTHING: True
