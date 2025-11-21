@@ -8,8 +8,8 @@ A character-level language modeling project implementing Transformer and LSTM ba
 - [Overview](#overview)
 - [Setup](#setup)
 - [Project Layout](#project-layout)
-- [Data](#data)
-- [Run & Develop](#run--develop)
+- [Dataset](#dataset)
+- [Key Training Parameters](#key-training-parameters)
 - [Configuration System](#configuration-system)
 - [Code Style (Check-Style)](#code-style-check-style)
 - [Branches](#branches)
@@ -89,9 +89,7 @@ conda deactivate
 └── README.md                   # This file
 ```
 
-## Data
-
-### Dataset Information
+## Dataset
 
 The **text8** dataset contains the first 100 million characters from a cleaned English Wikipedia dump. It includes only lowercase letters (a-z) and spaces, making it compact and ideal for benchmarking character-level models.
 
@@ -100,33 +98,7 @@ The **text8** dataset contains the first 100 million characters from a cleaned E
 - **Validation set**: ~5M characters
 - **Test set**: ~5M characters
 
-## Run & Develop
-
-### Quick Start
-
-1. **Open the training notebook**:
-   ```bash
-   jupyter lab transformer.ipynb
-   ```
-
-1. **Configure your experiment**:
-   - Edit `configs/baseline.yaml` or create a new config file
-   - Key parameters to adjust:
-     - `model.max_len`: Sequence length (L)
-     - `model.pos_encoding_type`: Positional encoding method
-     - `training.epochs`: Number of training iterations
-     - `loss.tail_scheme`: Position weighting scheme
-
-1. **Run training**:
-   - Execute cells sequentially in the notebook
-   - Training progress will be logged every `validation_interval` iterations
-   - Checkpoints are automatically saved to `checkpoints/`
-   - Results and plots are saved to `runs/`
-
-
-
-
-### Key Training Parameters
+## Key Training Parameters
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
