@@ -16,7 +16,7 @@ A character-level language modeling project implementing Transformer and LSTM ba
 
 ## Overview
 
-This project implements and trains small language models for character-level text generation using the text8 dataset (100M characters from Wikipedia). 
+This project implements and trains small language models for character-level text generation using the text8 dataset (100M characters from Wikipedia).
 
 **Key Features:**
 - Multiple positional encoding strategies (Learned, Sinusoidal, RoPE, ALiBi, Hybrid, Relative)
