@@ -251,7 +251,8 @@ def self_bleu(
     sample: bool,
     seed: int,
     n_grams: int = 4,
-    n_samples: int = 20) -> float:
+    n_samples: int = 20,
+    ngram_size=None) -> float:
     """
     model, config, int_to_char, char_to_int, char_set: defined else where in the cells before
     params: defined in the loop
@@ -273,7 +274,8 @@ def self_bleu(
             model, params, k, prompt_int, gen_len,
             block_size=config.model.max_len,
             temperature=temperature,
-            sample=sample
+            sample=sample,
+            ngram_size=ngram_size
         )
         cont_i = ''.join(int_to_char.get(int(x), '?') for x in list(out_ids_i[0])).strip()
         continuations.append(cont_i)
