@@ -18,7 +18,7 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     acc_last_test_history = metrics_logger.acc_last
 
     # Create a comprehensive figure with multiple subplots
-    fig, axes = plt.subplots(3, 2, figsize=(9, 10))
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 
     # ===== Plot 1: Loss Curves =====
     ax1 = axes[0, 0]
@@ -29,14 +29,14 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     ax1.scatter(iteration_history[best_idx], loss_test_history[best_idx],
                s=100, color='red', marker='*', zorder=5,
                label=f'Best: {loss_test_history[best_idx]:.4f}')
-    ax1.set_xlabel("Time (seconds)", fontsize=11)
+    ax1.set_xlabel("Iteration", fontsize=11)
     ax1.set_ylabel("Loss", fontsize=11)
     ax1.legend(loc='upper right')
     ax1.set_title("Training & Validation Loss", fontsize=12, fontweight='bold')
     ax1.grid(alpha=0.3)
 
     # ===== Plot 2: Last Char. Loss Curves =====
-    ax2 = axes[0, 1]
+    ax2 = axes[1, 0]
     ax2.plot(step_history, loss_last_history,'-', label='Train', color="blue", alpha=0.6)
     ax2.plot(iteration_history, loss_last_test_history, '-', label='Validation', lw=2, color="red")
     # Mark best test loss
@@ -44,14 +44,14 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     ax2.scatter(iteration_history[best_idx], loss_last_test_history[best_idx],
                s=100, color='red', marker='*', zorder=5,
                label=f'Best: {loss_last_test_history[best_idx]:.4f}')
-    ax2.set_xlabel("Time (seconds)", fontsize=11)
+    ax2.set_xlabel("Iteration", fontsize=11)
     ax2.set_ylabel("Loss", fontsize=11)
     ax2.legend(loc='upper right')
     ax2.set_title("Training & Validation Last Char Loss", fontsize=12, fontweight='bold')
     ax2.grid(alpha=0.3)
 
     # ===== Plot 3: Accuracy Curves =====
-    ax3 = axes[1, 0]
+    ax3 = axes[0, 1]
     ax3.plot(iteration_history, [100*x for x in acc_test_history], '-o',
             lw=2, markersize=3, color="green", label='Total Acc')
     # Mark best accuracy
@@ -71,7 +71,7 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     ax3.grid(alpha=0.3)
 
     # ===== Plot 4: Last Character Accuracy =====
-    ax4 = axes[1, 1]
+    ax4 = axes[0, 2]
     ax4.plot(iteration_history, [100*x for x in acc_last_test_history], '-s',
             lw=2, markersize=3, color="purple", label='Last Char Acc')
     # Mark best
@@ -90,7 +90,7 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     ax4.grid(alpha=0.3)
 
     # ===== Plot 5: Loss Convergence (smoothed) =====
-    ax5 = axes[2, 0]
+    ax5 = axes[1, 1]
     # Smooth the test loss curve
     window_size = max(1, len(loss_test_history) // 10)
     if window_size > 1:
@@ -114,5 +114,5 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     plt.show()
 
     # ===== Plot 7: Empty (for layout symmetry) =====
-    ax6 = axes[2, 1]
+    ax6 = axes[1, 2]
     ax6.axis('off')  # Hide the empty subplot
