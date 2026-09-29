@@ -1,0 +1,72 @@
+# Ablation: TR2o with weight decay on every parameter (as the original code). Run names:
+#   TR2o-legacy_s<seed>  = this config + --legacy-dropout-rng  (approximates the paper's training)
+#   TR2o-rngfix_s<seed>  = this config (fixed dropout RNG, no decay mask)
+model_name: TR2o-nomask
+
+model:
+  type: transformer
+  vocab_size: 27
+  d_model: 256
+  n_heads: 4
+  n_layers: 4
+  max_len: 128
+  mlp_ratio: 4
+  emb_dropout: 0.1
+  mlp_dropout: 0.1
+  attn_dropout: 0.1
+  resid_dropout: 0.1
+  # position encoding type: 'sinusoidal', 'learned', 'hybrid', 'rope', 'alibi', 'relative'
+  pos_encoding_type: 'rope'
+
+loss:
+  LABEL_SMOOTHING: True
+  ls_eps: 0.05
+  # entropy bonus weight
+  entropy_lambda: 0.0
+  # position weights mode, linear, sqrt, none
+  tail_scheme: 'linear'
+
+scheduler:
+  warmup_iters: 2000
+  init_value: 0.0
+  end_value: 0.0
+
+optimizer:
+  # AdamW (after clip_by_global_norm(grad_clip_norm)); these were hard-coded in the notebook
+  b1: 0.9
+  b2: 0.95
+  eps: 1.0e-8
+  weight_decay: 0.1
+  grad_clip_norm: 1.0
+  # true: decay only leaves with ndim >= 2 (never biases, LayerNorm, or rel_embed); false: decay everything
+  decay_mask: false
+
+training:
+  batch_size: 128
+  sequence_length: 128
+  learning_rate: 0.0004
+  epochs: 50000
+  validation_interval: 500
+  stage_checkpoint_interval: 10000
+  seed: 4212   # overridden by train.py --seed
+
+evaluation:
+  sample: True
+  seed: 4212
+  # prompt for text generation
+  prompt: "hello my fri"
+  # length of text to generate
+  gen_len: 1000
+  # temperature for text generation
+  temperature: 0.7
+  self_belu_n_grams: 4
+  self_belu_n_samples: 20
+  # sliding-window test evaluation (utils/full_context_eval.py): window = model.max_len
+  full_context_stride: 1
+  full_context_batch_size: 8192
+
+output:
+  # directory to save model checkpoints
+  checkpoint_dir: ./checkpoints
+  # directory to save training and evaluation results
+  results_dir: ./runs

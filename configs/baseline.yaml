@@ -1,6 +1,8 @@
 model_name: Baseline
 
 model:
+  # 'transformer' (models/models.py) or 'lstm' (models/LSTM.py)
+  type: transformer
   vocab_size: 27
   d_model: 256
   n_heads: 4
@@ -27,6 +29,16 @@ scheduler:
   init_value: 0.0
   end_value: 0.0
 
+optimizer:
+  # AdamW (after clip_by_global_norm(grad_clip_norm)); these were hard-coded in the notebook
+  b1: 0.9
+  b2: 0.95
+  eps: 1.0e-8
+  weight_decay: 0.1
+  grad_clip_norm: 1.0
+  # true: decay only leaves with ndim >= 2 (never biases, LayerNorm, or rel_embed); false: decay everything
+  decay_mask: true
+
 training:
   batch_size: 128
   sequence_length: 128
@@ -47,6 +59,9 @@ evaluation:
   temperature: 0.7
   self_belu_n_grams: 4
   self_belu_n_samples: 20
+  # sliding-window test evaluation (utils/full_context_eval.py): window = model.max_len
+  full_context_stride: 1
+  full_context_batch_size: 8192
   # ngram size for preventing ngram repetition during generation is set in transformer.ipynb  (null to disable)
 
 output:
