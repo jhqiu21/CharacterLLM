@@ -26,6 +26,8 @@ import numpy as np
 
 
 def num_windows(n_chars, window, stride):
+    if not 1 <= stride <= window:
+        raise ValueError(f"stride must be in [1, window={window}] or some targets are never scored, got {stride}")
     if n_chars - 1 < window:
         raise ValueError(f"need at least window+1={window + 1} characters, got {n_chars}")
     return 1 + math.ceil((n_chars - 1 - window) / stride)

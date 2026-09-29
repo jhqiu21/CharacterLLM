@@ -42,6 +42,12 @@ def test_every_target_scored_exactly_once(stride):
     assert n_new[0] == W and (n_new[1:] <= stride).all() and (n_new > 0).all()
 
 
+@pytest.mark.parametrize("stride", [0, W + 1])
+def test_stride_outside_1_to_window_is_rejected(stride):
+    with pytest.raises(ValueError):
+        num_windows(N, W, stride)
+
+
 @pytest.mark.parametrize("stride", [1, 7])
 @pytest.mark.parametrize("batch_size", [8, 5])  # both leave a padded final batch
 def test_scored_count_is_n_minus_1(setup, stride, batch_size):
