@@ -47,7 +47,7 @@ class Logger:
         print(f"\t \t accuracy (last character): {100*self.acc_last[-1]:.1f}%")
         print(f"\t \t perplexity: {self.perplexity[-1]:.4f}")
         print(f"\t \t bits-per-character: {self.bpc[-1]:.4f}")
-        print(f"\t \t ECE: {self.ece[0]:.4f}")
+        print(f"\t \t ECE: {self.ece[-1]:.4f}")
         print(f"\t \t pred_entropy: {self.pred_entropy[-1]:.4f}")
 
     def isBest(self, test_metrics):

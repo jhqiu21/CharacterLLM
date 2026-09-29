@@ -3,10 +3,11 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def test_checkpoint(model, param, test_data, int_to_char):
+def test_checkpoint(model, param, test_data, int_to_char, sequence_length=32, batch_size=1024):
+    # Non-overlapping blocks of `sequence_length` characters, so position t of every block
+    # sees only t characters of context. The default of 32 reproduces the original evaluation;
+    # pass sequence_length=model.max_len to measure Acc_last at the last trained position.
     data_length = len(test_data)
-    batch_size = 1024
-    sequence_length = 32
     num_blocks = (data_length - 1) // sequence_length
     num_batches = max(1, num_blocks // batch_size)
 
@@ -76,6 +77,7 @@ def get_batch_test(text_int, it, B, T):
     starts = starts[starts + T < len(text_int)]
     if starts.size == 0:
         return None
-    x = jnp.stack([text_int[s:s + T] for s in starts])
-    y = jnp.stack([text_int[s + 1:s + 1 + T] for s in starts])
+    # np.stack (one host->device copy below) instead of jnp.stack over B slices: same values, ~100x faster
+    x = np.stack([text_int[s:s + T] for s in starts])
+    y = np.stack([text_int[s + 1:s + 1 + T] for s in starts])
     return jnp.array(x, dtype=jnp.int32), jnp.array(y, dtype=jnp.int32)

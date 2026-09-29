@@ -28,6 +28,7 @@ dependencies:
       # deep learning libraries
       - flax
       - optax
+      - nltk                   # Self-BLEU in utils/eval.py
 
       # ====== Code quality & style checks ======
       - ruff                   # Unified linting and formatting
