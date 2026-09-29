@@ -1,0 +1,13 @@
+{
+  "s_per_step_median": 0.01840491220355034,
+  "tokens_per_s": 890197.1288316984,
+  "timing_iterations": "iterations [1000, 2000) excluding validation iterations",
+  "n_timed_steps": 998,
+  "s_per_step_mean_all_iterations_incl_validation": 0.024062122445106505,
+  "total_train_time_s": 1203.1061222553253,
+  "batch_size": 128,
+  "sequence_length": 128,
+  "device": "NVIDIA A100 80GB PCIe",
+  "cuda_visible_devices": "0",
+  "peak_device_memory_gib_training": 1.97
+}

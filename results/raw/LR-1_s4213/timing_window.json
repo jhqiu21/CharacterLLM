@@ -1,0 +1,9 @@
+{
+  "start": "2026-09-29T18:46:44",
+  "end_conservative": "2026-09-29T18:49:18",
+  "sampler_samples_in_window": 30,
+  "foreign_processes_in_window": {
+    "1248905": "python /tests/verify.py"
+  },
+  "shared_in_timing_window": true
+}

@@ -1,0 +1,7 @@
+{
+  "start": "2026-09-29T22:00:29",
+  "end_conservative": "2026-09-29T22:02:52",
+  "sampler_samples_in_window": 28,
+  "foreign_processes_in_window": {},
+  "shared_in_timing_window": false
+}

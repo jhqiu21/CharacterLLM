@@ -1,0 +1,11 @@
+{
+  "start": "2026-09-29T14:08:16",
+  "end_conservative": "2026-09-29T14:10:30",
+  "sampler_samples_in_window": 24,
+  "foreign_processes_in_window": {
+    "3476926": "python scripts/rgo_diag.py --out results/router_gonogo_20260928T014247Z --router F1m=runs/lr2e-7/rou",
+    "3476925": "python scripts/rgo_diag.py --out results/router_gonogo_20260928T014247Z --router F1m=runs/lr2e-7/rou",
+    "3476927": "python scripts/rgo_diag.py --out results/router_gonogo_20260928T014247Z --router F1m=runs/lr2e-7/rou"
+  },
+  "shared_in_timing_window": true
+}

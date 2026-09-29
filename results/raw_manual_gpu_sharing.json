@@ -1,0 +1,6 @@
+{
+  "_note": "GPU sharing during the throughput-timing window for runs that predate scripts/gpu_sampler.py (started 2026-09-29 13:54:37). Evidence from nvidia-smi / ps -o lstart / config.yaml mtimes, recorded by hand.",
+  "TR2o-legacy_s4212": {"shared_in_timing_window": true, "evidence": "another project's scripts/rgo_reeval.py (5 processes, ~33-41 GB, 100% util) ran for the whole run; the launcher saw them at every poll"},
+  "TR2o-legacy_s4213": {"shared_in_timing_window": false, "evidence": "config.yaml written 13:07:35, iteration 2000 reached 65.4 s after the training loop started, so the window ended by ~13:09:10 (allowing <=30 s setup); rgo_reeval.py had exited; the next foreign job (scripts/rgo_diag.py, 3 processes) started 13:09:37 (ps lstart); measured 0.0165 s/step vs 0.0334 under contention"},
+  "TR2o-legacy_s4214": {"shared_in_timing_window": true, "evidence": "started 13:36:05 while scripts/rgo_diag.py (started 13:09:37) was running"}
+}
