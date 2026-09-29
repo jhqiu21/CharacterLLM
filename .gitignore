@@ -188,6 +188,8 @@ checkpoints/
 *.json
 *.png
 runs/*
+# small result files (copies of runs/*/eval.json etc.) are committed for traceability
+!results/**/*.json
 
 # ==========================================
 # Miscellaneous tools
