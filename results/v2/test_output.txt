@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.21, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/kaiwen/VLM/CharacterLLM
+configfile: pyproject.toml
+testpaths: tests
+plugins: platformdirs-4.12.1
+collected 217 items
+
+tests/test_attention_unified.py ...................                      [  8%]
+tests/test_causality.py .....................                            [ 18%]
+tests/test_cli.py .................                                      [ 26%]
+tests/test_decay_mask.py ............                                    [ 31%]
+tests/test_dropout_rng.py ......                                         [ 34%]
+tests/test_full_context_eval.py .................                        [ 42%]
+tests/test_generation.py ............................................... [ 64%]
+..................................                                       [ 79%]
+tests/test_lr_schedule.py .....                                          [ 82%]
+tests/test_lstm_forget_bias.py .......                                   [ 85%]
+tests/test_param_counts.py .........                                     [ 89%]
+tests/test_self_bleu.py ...                                              [ 90%]
+tests/test_sinusoidal_scale.py .......                                   [ 94%]
+tests/test_train_loss.py ..........                                      [ 98%]
+tests/test_train_pieces.py ...                                           [100%]
+
+======================= 217 passed in 393.97s (0:06:33) ========================
