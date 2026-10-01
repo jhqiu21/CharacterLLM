@@ -2,8 +2,14 @@
 Canonical training + evaluation entry point (the logic formerly in transformer.ipynb).
 
     python train.py --config configs/TR2o.yaml --seed 4212 [--run-name NAME] [--legacy-dropout-rng]
+                    [--set section.key=value ...] [--tuning] [--data-dir DIR]
                     [--epochs N] [--val-interval N] [--fc-stride S] [--eval-only]
 
+--set overrides a dotted config key (repeatable; values parsed as int, float, bool or string; unknown keys
+are an error); overrides are recorded under run.overrides in the run's config.yaml.
+--tuning never opens the test file: checkpoints are selected on the fixed validation set as usual, and the
+best-loss checkpoint is then scored with full-context evaluation on the validation split
+(stride evaluation.tuning_val_stride) into val_eval.json; no test metrics, samples or Self-BLEU.
 --epochs / --val-interval / --fc-stride are for smoke tests only. --eval-only re-runs the final
 evaluation from the checkpoints of an existing run. GPU selection comes from CUDA_VISIBLE_DEVICES.
 
@@ -12,12 +18,16 @@ Differences from the original notebook (everything else is unchanged):
   * init / dropout keys and batch sampling are seeded from --seed;
   * optional weight-decay mask (optimizer.decay_mask) that skips biases, LayerNorm and rel_embed;
   * validation uses one fixed set of 1024 windows of length training.sequence_length (seed 0);
-  * the loss is built by make_loss_and_metrics(config) instead of closing over a global config;
-  * test evaluation in three modes (legacy32, chunked128, full_context), written to eval.json.
+  * the loss is built by make_loss_and_metrics(config) instead of closing over a global config; the training
+    step uses the lean make_train_loss(config) (same loss and gradients, only the logged training metrics);
+  * the warmup-cosine schedule reaches end_value at the last iteration (the notebook's reached 0 at epochs - warmup);
+  * test evaluation in three modes (legacy32, chunked128, full_context), written to eval.json, plus
+    single-prompt and multi-prompt Self-BLEU.
 """
 
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
@@ -72,8 +82,23 @@ DEFAULTS = {
     "model": {"type": "transformer"},
     # Values previously hard-coded in the notebook, plus the decay mask switch.
     "optimizer": {"b1": 0.9, "b2": 0.95, "eps": 1e-8, "weight_decay": 0.1, "grad_clip_norm": 1.0, "decay_mask": True},
-    "evaluation": {"full_context_stride": 1, "full_context_batch_size": 8192},
+    "evaluation": {
+        "full_context_stride": 1,
+        "full_context_batch_size": 8192,
+        # multi-prompt Self-BLEU: n_prompts validation passages of prompt_len chars, n_samples continuations each
+        "self_bleu_multi_n_prompts": 10,
+        "self_bleu_multi_n_samples": 20,
+        "self_bleu_multi_prompt_len": 128,
+        # --tuning: full-context evaluation of the validation split with this stride
+        "tuning_val_stride": 8,
+    },
 }
+# Per model.type defaults (only added for that type).
+MODEL_DEFAULTS = {
+    "transformer": {"sinusoidal_scale": "unit"},  # 'unit': sinusoidal rows have norm 1; 'raw': norm sqrt(d_model/2)
+    "lstm": {"forget_bias": 1.0},                 # initial forget-gate bias; 0.0 = original all-zero bias
+}
+SELF_BLEU_PROMPT_SEED = 0
 
 
 # ----------------------------------------------------------------------------------------------
@@ -91,14 +116,19 @@ def encode(s):
     return ids
 
 
-def load_data(data_dir=REPO_ROOT / "data"):
-    """First 95% of the train file is train, the rest validation; the test file is test."""
+def load_data(data_dir=REPO_ROOT / "data", include_test=True):
+    """First 95% of the train file is train, the rest validation; the test file is test.
+
+    With include_test=False the test file is never opened and None is returned in its place.
+    """
     with open(Path(data_dir) / "text8_train.txt", "r") as f:
         train_text_full = f.read()
-    with open(Path(data_dir) / "text8_test.txt", "r") as f:
-        test_text = f.read()
+    test_int = None
+    if include_test:
+        with open(Path(data_dir) / "text8_test.txt", "r") as f:
+            test_int = encode(f.read())
     cut = int(len(train_text_full) * TRAIN_RATIO)
-    return encode(train_text_full[:cut]), encode(train_text_full[cut:]), encode(test_text)
+    return encode(train_text_full[:cut]), encode(train_text_full[cut:]), test_int
 
 
 def get_batch(text_int, B, T, np_rng):
@@ -113,6 +143,18 @@ def make_fixed_val_set(val_int, T, n=VAL_SET_SIZE, seed=VAL_SET_SEED):
     return get_batch(val_int, n, T, np.random.default_rng(seed))
 
 
+def self_bleu_prompt_offsets(n_val, n_prompts, prompt_len, seed=SELF_BLEU_PROMPT_SEED):
+    """Sorted, distinct start offsets of the multi-prompt Self-BLEU passages in the validation split.
+    Depend only on the validation length and these constants, never on the training seed."""
+    return np.sort(np.random.default_rng(seed).choice(n_val - prompt_len + 1, size=n_prompts, replace=False))
+
+
+def make_self_bleu_prompts(val_int, n_prompts, prompt_len, seed=SELF_BLEU_PROMPT_SEED):
+    """(offsets, prompts): n_prompts validation passages of prompt_len characters, shape (n_prompts, prompt_len)."""
+    offsets = self_bleu_prompt_offsets(len(val_int), n_prompts, prompt_len, seed)
+    return offsets, np.stack([np.asarray(val_int[o:o + prompt_len], dtype=np.int32) for o in offsets])
+
+
 # ----------------------------------------------------------------------------------------------
 # Config, model, loss, optimizer
 # ----------------------------------------------------------------------------------------------
@@ -123,7 +165,46 @@ def resolve_config(config):
         d.setdefault(section, {})
         for k, v in values.items():
             d[section].setdefault(k, v)
+    for k, v in MODEL_DEFAULTS.get(d["model"]["type"], {}).items():
+        d["model"].setdefault(k, v)
     return Config(d)
+
+
+def parse_override_value(text):
+    """'true'/'false' -> bool, then int, then float, else the string itself."""
+    if text.lower() in ("true", "false"):
+        return text.lower() == "true"
+    for cast in (int, float):
+        try:
+            return cast(text)
+        except ValueError:
+            pass
+    return text
+
+
+def apply_overrides(d, assignments):
+    """Apply 'a.b.c=value' assignments to the config dict `d` in place; return {key: parsed value}.
+
+    Only existing keys (after defaults are resolved) can be set, and only to non-section values.
+    """
+    applied = {}
+    for item in assignments or []:
+        key, sep, raw = item.partition("=")
+        key = key.strip()
+        if not sep or not key:
+            raise ValueError(f"--set expects key=value, got {item!r}")
+        *parents, leaf = key.split(".")
+        node = d
+        for part in parents:
+            if not isinstance(node, dict) or not isinstance(node.get(part), dict):
+                raise KeyError(f"--set {key}: unknown config section {part!r}")
+            node = node[part]
+        if leaf not in node:
+            raise KeyError(f"--set {key}: unknown config key (known in this section: {sorted(node)})")
+        if isinstance(node[leaf], dict):
+            raise KeyError(f"--set {key}: is a section, not a value")
+        node[leaf] = applied[key] = parse_override_value(raw.strip())
+    return applied
 
 
 def build_model(config):
@@ -141,6 +222,7 @@ def build_model(config):
             attn_dropout=m.attn_dropout,
             resid_dropout=m.resid_dropout,
             pos_encoding_type=m.pos_encoding_type,
+            sinusoidal_scale=getattr(m, "sinusoidal_scale", MODEL_DEFAULTS["transformer"]["sinusoidal_scale"]),
         )
     if m.type == "lstm":
         return lstm_models.CharLSTM(
@@ -149,6 +231,7 @@ def build_model(config):
             n_layers=m.n_layers,
             dropout=m.dropout,
             max_len=m.max_len,
+            forget_bias=float(getattr(m, "forget_bias", MODEL_DEFAULTS["lstm"]["forget_bias"])),
         )
     raise ValueError(f"Unknown model.type: {m.type}")
 
@@ -162,18 +245,16 @@ def count_params(params):
     return sum(x.size for x in jax.tree_util.tree_leaves(params))
 
 
-def make_loss_and_metrics(config):
-    """Training loss (label smoothing, tail position weights, entropy bonus) plus unweighted metrics.
-
-    Config values are read once here, so the returned jitted function never depends on a global.
-    """
+def make_training_loss(config):
+    """The optimised loss (label smoothing, tail position weights, entropy bonus) as a pure function
+    (logits, targets) -> scalar. Shared by make_train_loss and make_loss_and_metrics, so both optimise
+    exactly the same objective. Label smoothing is off when LABEL_SMOOTHING is false or ls_eps is 0."""
     label_smoothing = bool(config.loss.LABEL_SMOOTHING) and float(config.loss.ls_eps) > 0.0
     ls_eps = float(config.loss.ls_eps)
     tail_scheme = config.loss.tail_scheme
     entropy_lambda = float(config.loss.entropy_lambda)
 
-    @jax.jit
-    def loss_and_metrics(logits, targets):
+    def training_loss(logits, targets):
         B, T, V = logits.shape
 
         if label_smoothing:
@@ -204,6 +285,39 @@ def make_loss_and_metrics(config):
             train_loss = loss_weighted - entropy_lambda * entropy
         else:
             train_loss = loss_weighted
+        return train_loss
+
+    return training_loss
+
+
+def make_train_loss(config):
+    """Lean loss for the training step: the optimised loss plus only what Logger.log_train records
+    (loss_train, loss_all, loss_last). Same loss and gradients as make_loss_and_metrics."""
+    training_loss = make_training_loss(config)
+
+    @jax.jit
+    def train_loss(logits, targets):
+        loss = training_loss(logits, targets)
+        return loss, {
+            "loss_train": loss,
+            "loss_all": eval_utils.loss_all(logits, targets),
+            "loss_last": eval_utils.cross_entropy_last_token_only(logits, targets),
+        }
+
+    return train_loss
+
+
+def make_loss_and_metrics(config):
+    """Training loss (label smoothing, tail position weights, entropy bonus) plus unweighted metrics
+    (accuracy, perplexity, BPC, entropy, ECE). Used for validation.
+
+    Config values are read once here, so the returned jitted function never depends on a global.
+    """
+    training_loss = make_training_loss(config)
+
+    @jax.jit
+    def loss_and_metrics(logits, targets):
+        train_loss = training_loss(logits, targets)
 
         # Unweighted metrics for comparison (not used for backprop)
         loss_all = eval_utils.loss_all(logits, targets)
@@ -243,12 +357,36 @@ def decay_mask_fn(params):
     )
 
 
+def warmup_cosine_schedule(init_value, peak_value, warmup_steps, decay_steps, end_value):
+    """optax.warmup_cosine_decay_schedule with the same arguments (decay_steps = total length incl. warmup),
+    computed in a float32-safe form.
+
+    optax evaluates 0.5 * (1 + cos(pi * t / T)), which cancels to exactly 0 in float32 for the last few
+    steps (e.g. step 49,999 of 50,000). This uses the identity 0.5 * (1 + cos x) = cos(x / 2)^2, so the rate
+    stays > 0 until it equals end_value at step decay_steps.
+    """
+    warmup_steps = int(warmup_steps)
+    cosine_steps = int(decay_steps) - warmup_steps
+    if cosine_steps <= 0:
+        raise ValueError(f"decay_steps ({decay_steps}) must exceed warmup_steps ({warmup_steps})")
+    init_value, peak_value, end_value = float(init_value), float(peak_value), float(end_value)
+
+    def cosine(count):
+        frac = jnp.clip(count / cosine_steps, 0.0, 1.0)
+        value = end_value + (peak_value - end_value) * jnp.square(jnp.cos(0.5 * math.pi * frac))
+        return jnp.where(count >= cosine_steps, end_value, value)
+
+    return optax.join_schedules([optax.linear_schedule(init_value, peak_value, warmup_steps), cosine], [warmup_steps])
+
+
 def make_lr_schedule(config):
-    return optax.warmup_cosine_decay_schedule(
+    """Linear warmup over scheduler.warmup_iters, then cosine decay that reaches end_value at
+    training.epochs (optax's decay_steps is the total length, warmup included)."""
+    return warmup_cosine_schedule(
         init_value=config.scheduler.init_value,
         peak_value=config.training.learning_rate,
         warmup_steps=config.scheduler.warmup_iters,
-        decay_steps=max(1, config.training.epochs - config.scheduler.warmup_iters),
+        decay_steps=config.training.epochs,
         end_value=config.scheduler.end_value,
     )
 
@@ -268,11 +406,13 @@ def make_optimizer(config):
     )
 
 
-def make_train_step(model, loss_and_metrics, tx):
+def make_train_step(model, loss_fn_of_logits, tx):
+    """Jitted (params, opt_state, x, y, step_key) -> (params, opt_state, metrics). `loss_fn_of_logits`
+    maps (logits, targets) -> (loss, metrics): make_train_loss(config) (train.py) or make_loss_and_metrics."""
     def train_step(params, opt_state, x, y, step_key):
         def loss_fn(params):
             logits = model.apply({"params": params}, x, deterministic=False, rngs={"dropout": step_key})
-            return loss_and_metrics(logits, y)
+            return loss_fn_of_logits(logits, y)
 
         (_, metrics), grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
         updates, new_opt_state = tx.update(grads, opt_state, params)
@@ -364,10 +504,10 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
     params = init_params(model, config, init_key)
     print(f"Model created: {config.model_name} ({config.model.type}), parameters: {count_params(params):_}")
 
-    loss_and_metrics = make_loss_and_metrics(config)
+    loss_and_metrics = make_loss_and_metrics(config)  # validation: full metric set
     tx = make_optimizer(config)
     opt_state = tx.init(params)
-    train_step = make_train_step(model, loss_and_metrics, tx)
+    train_step = make_train_step(model, make_train_loss(config), tx)  # training: lean loss
     apply_fn = make_apply_fn(model)
 
     val_x, val_y = make_fixed_val_set(val_int, T)
@@ -495,8 +635,9 @@ def run_test_checkpoint(model, params, test_int, sequence_length):
 
 def generate_sample(model, config, params):
     rng = jax.random.PRNGKey(config.evaluation.seed)
+    # (generate_tokens keeps the last max_len tokens of a longer prompt)
     prompt_int = jnp.array(
-        [[CHAR_TO_INT.get(c, len(CHAR_SET)) for c in config.evaluation.prompt.lower()[:config.model.max_len]]],
+        [[CHAR_TO_INT.get(c, len(CHAR_SET)) for c in config.evaluation.prompt.lower()]],
         dtype=jnp.int32,
     )
     out_ids = generation.generate_tokens(
@@ -539,12 +680,40 @@ def write_text_report(path, name, checkpoint, entry, config, full_text):
                     f"Common {100 * fc['acc_common']:.2f}%\n")
         if "self_bleu_4" in entry:
             f.write(f"Self-BLEU-{config.evaluation.self_belu_n_grams}: {entry['self_bleu_4']:.4f}\n")
+        if "self_bleu_4_multi" in entry:
+            sbm = entry["self_bleu_4_multi"]
+            f.write(f"Self-BLEU-{config.evaluation.self_belu_n_grams} (multi-prompt, {sbm['n_prompts']} validation prompts x "
+                    f"{sbm['n_samples']} samples): {sbm['mean']:.4f} +- {sbm['std']:.4f}\n")
         f.write("\n")
         f.write(full_text)
 
 
+def multi_prompt_self_bleu(model, config, params, val_int):
+    ev = config.evaluation
+    offsets, prompts = make_self_bleu_prompts(val_int, ev.self_bleu_multi_n_prompts, ev.self_bleu_multi_prompt_len)
+    out = eval_utils.self_bleu_multi_prompt(
+        model, params, prompts, INT_TO_CHAR,
+        block_size=config.model.max_len,
+        gen_len=ev.gen_len,
+        temperature=ev.temperature,
+        sample=ev.sample,
+        seed=ev.seed,
+        n_grams=ev.self_belu_n_grams,
+        n_samples=ev.self_bleu_multi_n_samples,
+        ngram_size=None,
+    )
+    out.update({
+        "prompt_source": "validation split",
+        "prompt_len": int(ev.self_bleu_multi_prompt_len),
+        "prompt_offsets": [int(o) for o in offsets],
+        "prompt_offset_seed": SELF_BLEU_PROMPT_SEED,
+        "std_ddof": 1,
+    })
+    return out
+
+
 def evaluate(config, model, data, run_dir, stage_dir, best_dir, meta):
-    train_int, _, test_int = data
+    train_int, val_int, test_int = data
     groups = frequency_groups(train_int, config.model.vocab_size, INT_TO_CHAR)
     print("Rare characters (training-corpus frequency):", [g["char"] for g in groups["rare"]])
     print("Common characters (training-corpus frequency):", [g["char"] for g in groups["common"]])
@@ -592,6 +761,7 @@ def evaluate(config, model, data, run_dir, stage_dir, best_dir, meta):
                 n_samples=config.evaluation.self_belu_n_samples,
                 ngram_size=None,
             ))
+            entry["self_bleu_4_multi"] = multi_prompt_self_bleu(model, config, params, val_int)
             full_text = generate_sample(model, config, params)
             sample_path = run_dir / (prefix.replace("_", "") + ".txt")
             write_text_report(sample_path, name, checkpoint, entry, config, full_text)
@@ -601,6 +771,44 @@ def evaluate(config, model, data, run_dir, stage_dir, best_dir, meta):
         results["peak_device_memory_gib"] = peak_memory_gib()
         with open(run_dir / "eval.json", "w") as f:  # write after every checkpoint
             json.dump(to_jsonable(results), f, indent=2)
+    return results
+
+
+def evaluate_tuning(config, model, data, run_dir, stage_dir, best_dir, meta):
+    """--tuning: score the best-loss checkpoint with full-context evaluation on the validation split.
+    Never touches the test split (data[2] is None) and writes no samples or Self-BLEU."""
+    train_int, val_int, test_int = data
+    assert test_int is None, "tuning mode must not load the test split"
+    groups = frequency_groups(train_int, config.model.vocab_size, INT_TO_CHAR)
+    results = dict(meta)
+    results["split"] = "validation"
+    results["frequency_groups"] = groups
+    timing_path = run_dir / "timing.json"
+    results["throughput"] = json.load(open(timing_path)) if timing_path.exists() else None
+
+    prefix, name, _ = CHECKPOINT_TYPES[0]
+    checkpoint = load_checkpoint(prefix, name, best_dir, stage_dir)
+    if checkpoint is None:
+        raise FileNotFoundError(f"no {prefix} checkpoint in {best_dir}")
+    entry = {k: to_jsonable(checkpoint[k]) for k in
+             ("step", "val_loss", "val_bpc", "val_perplexity", "val_acc", "val_acc_last", "ECE")}
+    fc = full_context_eval(
+        model, checkpoint["params"], val_int,
+        window=config.model.max_len,
+        stride=config.evaluation.tuning_val_stride,
+        batch_size=config.evaluation.full_context_batch_size,
+        vocab_size=config.model.vocab_size,
+        rare_ids=groups["rare_ids"],
+        common_ids=groups["common_ids"],
+    )
+    assert fc["n_scored"] == len(val_int) - 1, (fc["n_scored"], len(val_int) - 1)
+    entry["full_context"] = fc
+    print(f"\t validation full_context (W={fc['window']}, S={fc['stride']}, {fc['seconds']:.0f}s): BPC {fc['bpc']:.4f}, "
+          f"acc {100 * fc['acc']:.2f}%, ECE {fc['ece']:.4f}")
+    results["checkpoints"] = {prefix: entry}
+    results["peak_device_memory_gib"] = peak_memory_gib()
+    with open(run_dir / "val_eval.json", "w") as f:
+        json.dump(to_jsonable(results), f, indent=2)
     return results
 
 
@@ -618,30 +826,43 @@ def parse_args(argv=None):
     p.add_argument("--val-interval", type=int, default=None, help="override training.validation_interval (smoke tests only)")
     p.add_argument("--fc-stride", type=int, default=None, help="override evaluation.full_context_stride (smoke tests only)")
     p.add_argument("--eval-only", action="store_true", help="skip training; evaluate the run's saved checkpoints")
+    p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE",
+                   help="override a dotted config key, e.g. training.learning_rate=6e-4 (repeatable)")
+    p.add_argument("--tuning", action="store_true",
+                   help="hyperparameter-search mode: never open the test file; write val_eval.json instead of eval.json")
+    p.add_argument("--data-dir", default=str(REPO_ROOT / "data"), help="directory with text8_train.txt / text8_test.txt")
     return p.parse_args(argv)
+
+
+def build_run_config(args):
+    """Resolved config dict for a new run: YAML + defaults, then --seed, --set, then the smoke-test flags."""
+    d = resolve_config(load_config(args.config)).to_dict()
+    if any(item.partition("=")[0].strip() == "training.seed" for item in args.overrides):
+        raise KeyError("--set training.seed: use --seed")
+    d["training"]["seed"] = args.seed
+    overrides = apply_overrides(d, args.overrides)
+    if args.epochs is not None:
+        d["training"]["epochs"] = overrides["training.epochs"] = args.epochs
+    if args.val_interval is not None:
+        d["training"]["validation_interval"] = overrides["training.validation_interval"] = args.val_interval
+    if args.fc_stride is not None:
+        d["evaluation"]["full_context_stride"] = overrides["evaluation.full_context_stride"] = args.fc_stride
+    if d["training"]["epochs"] <= d["scheduler"]["warmup_iters"]:
+        # The warmup-cosine schedule needs epochs > warmup; shrink warmup for smoke tests only.
+        d["scheduler"]["warmup_iters"] = overrides["scheduler.warmup_iters"] = max(1, d["training"]["epochs"] // 10)
+    return d, overrides
 
 
 def main(argv=None):
     args = parse_args(argv)
     os.chdir(REPO_ROOT)
-    config = resolve_config(load_config(args.config))
-    d = config.to_dict()
-    d["training"]["seed"] = args.seed
-    overrides = {}
-    if args.epochs is not None:
-        d["training"]["epochs"] = overrides["training.epochs"] = args.epochs
-        if args.epochs <= d["scheduler"]["warmup_iters"]:
-            # The warmup-cosine schedule needs epochs > warmup; shrink warmup for smoke tests only.
-            d["scheduler"]["warmup_iters"] = overrides["scheduler.warmup_iters"] = max(1, args.epochs // 10)
-    if args.val_interval is not None:
-        d["training"]["validation_interval"] = overrides["training.validation_interval"] = args.val_interval
-    if args.fc_stride is not None:
-        d["evaluation"]["full_context_stride"] = overrides["evaluation.full_context_stride"] = args.fc_stride
+    d, overrides = build_run_config(args)
     run_name = args.run_name or f"{d['model_name']}_s{args.seed}"
     d["run"] = {
         "run_name": run_name,
         "seed": args.seed,
         "legacy_dropout_rng": bool(args.legacy_dropout_rng),
+        "tuning": bool(args.tuning),
         "config_file": str(args.config),
         "overrides": overrides,
         "git_commit": git_commit(),
@@ -656,22 +877,32 @@ def main(argv=None):
             d["evaluation"]["full_context_stride"] = args.fc_stride
             d["run"]["overrides"]["evaluation.full_context_stride"] = args.fc_stride
         d["run"]["eval_git_commit"] = git_commit()
-        config = Config(d)
+        d["run"]["tuning"] = bool(args.tuning)
+        config = resolve_config(Config(d))
 
     for p in (run_dir, stage_dir, best_dir):
         p.mkdir(parents=True, exist_ok=True)
     log_file = open(run_dir / ("eval.log" if args.eval_only else "train.log"), "a" if args.eval_only else "w")
     sys.stdout = Tee(sys.__stdout__, log_file)
     sys.stderr = Tee(sys.__stderr__, log_file)
+    try:
+        run(args, config, run_name, run_dir, stage_dir, best_dir)
+    finally:
+        sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
+        log_file.close()
 
+
+def run(args, config, run_name, run_dir, stage_dir, best_dir):
+    tuning = bool(args.tuning)
     print(f"Run {run_name}: config {args.config}, seed {config.run.seed}, devices {jax.devices()}, "
-          f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}, eval_only={args.eval_only}")
+          f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}, eval_only={args.eval_only}, tuning={tuning}")
     if not args.eval_only:
         save_config(config, run_dir / "config.yaml")
     print(json.dumps(config.to_dict(), indent=2))
 
-    data = load_data()
-    print(f"train {len(data[0]):_} / val {len(data[1]):_} / test {len(data[2]):_} characters")
+    data = load_data(args.data_dir, include_test=not tuning)
+    print(f"train {len(data[0]):_} / val {len(data[1]):_} / test "
+          f"{'NOT LOADED (tuning mode)' if tuning else f'{len(data[2]):_}'} characters")
     model = build_model(config)
 
     if not args.eval_only:
@@ -693,8 +924,12 @@ def main(argv=None):
         "eval_git_commit": getattr(config.run, "eval_git_commit", config.run.git_commit),
         "device": jax.devices()[0].device_kind,
     }
-    evaluate(config, model, data, run_dir, stage_dir, best_dir, meta)
-    print(f"\nDone: {run_dir / 'eval.json'}")
+    if tuning:
+        evaluate_tuning(config, model, data, run_dir, stage_dir, best_dir, meta)
+        print(f"\nDone: {run_dir / 'val_eval.json'}")
+    else:
+        evaluate(config, model, data, run_dir, stage_dir, best_dir, meta)
+        print(f"\nDone: {run_dir / 'eval.json'}")
 
 
 if __name__ == "__main__":

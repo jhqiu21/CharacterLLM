@@ -54,9 +54,11 @@ class MLP(nn.Module):
 class MultiHeadAttentionWithPE(nn.Module):
     """Multi-head attention with support for various positional encodings.
 
-    This is a custom implementation that allows:
+    Used by every pos_encoding_type, so all encodings share one attention implementation
+    (including independent attention-dropout masks per batch element and head). It allows:
     - RoPE to be applied to Q and K
     - ALiBi/Relative biases to be added to attention scores
+    For 'learned', 'sinusoidal' and 'hybrid' (applied to the embeddings) it is plain causal attention.
     """
 
     d_model: int
@@ -192,21 +194,15 @@ class DecoderBlock(nn.Module):
     def __call__(self, x, *, mask=None, deterministic: bool):
         h = nn.LayerNorm()(x)
 
-        if self.pos_encoding_type in ['rope', 'alibi', 'relative']:
-            h = MultiHeadAttentionWithPE(
-                d_model=self.d_model,
-                n_heads=self.n_heads,
-                attn_dropout=self.attn_dropout,
-                pos_encoding_type=self.pos_encoding_type,
-                max_len=self.max_len
-            )(h, mask=mask, deterministic=deterministic)
-        else:
-            # default SelfAttention for sinusoidal, hybrid
-            h = nn.SelfAttention(
-                num_heads=self.n_heads,
-                use_bias=False,
-                dropout_rate=self.attn_dropout,
-            )(h, mask=mask, deterministic=deterministic)
+        # One attention implementation for every pos_encoding_type (Flax nn.SelfAttention is not used:
+        # its default broadcast_dropout=True shares one attention-dropout mask across batch and heads).
+        h = MultiHeadAttentionWithPE(
+            d_model=self.d_model,
+            n_heads=self.n_heads,
+            attn_dropout=self.attn_dropout,
+            pos_encoding_type=self.pos_encoding_type,
+            max_len=self.max_len
+        )(h, mask=mask, deterministic=deterministic)
 
         h = nn.Dropout(rate=self.resid_dropout)(h, deterministic=deterministic)
         x = x + h  # residual connection
@@ -227,13 +223,12 @@ class DecoderOnlyTransformer(nn.Module):
 
     Components:
       - Token embeddings: maps token ids to D-dim vectors
-      - Learned positional embeddings: adds position information (0..T-1)
+      - Position information, depending on pos_encoding_type: added to the embeddings
+        ('learned', 'sinusoidal', 'hybrid') or applied inside attention ('rope', 'alibi', 'relative')
       - N stacked decoder blocks with causal self-attention
       - Final LayerNorm
-      - Output projection:
-          * If tie_weights=True (default), reuse token embedding matrix E to
-            compute logits via x @ E^T (implemented via einsum).
-          * Else, use a separate linear head to project to V logits.
+      - Output projection: a separate (untied) linear head `project_to_vocab` to V logits;
+        the token embedding matrix is not reused.
 
     Args:
       vocab_size: Vocabulary size V.
@@ -241,6 +236,8 @@ class DecoderOnlyTransformer(nn.Module):
       n_layers: Number of decoder blocks.
       n_heads: Attention heads per block.
       max_len: Maximum supported sequence length for positional embeddings.
+      sinusoidal_scale: 'unit' (rows of the sinusoidal table have norm 1) or 'raw' (norm sqrt(D/2));
+        used by 'sinusoidal' and the sinusoidal half of 'hybrid'.
     """
 
     vocab_size: int
@@ -254,7 +251,8 @@ class DecoderOnlyTransformer(nn.Module):
     mlp_dropout: float        # MLP dropout
     attn_dropout: float       # attention weights dropout
     resid_dropout: float      # post-attention/MLP dropout
-    pos_encoding_type: str    # positional encoding type: 'learned', 'sinusoidal', 'hybrid', 'rope', 'alibi'
+    pos_encoding_type: str    # positional encoding type: 'learned', 'sinusoidal', 'hybrid', 'rope', 'alibi', 'relative'
+    sinusoidal_scale: str = "unit"  # 'unit' or 'raw' (see positional_encodings.sinusoidal_scale_factor)
 
     def setup(self):
         # Token embedding table E with shape (V, D)
@@ -272,12 +270,14 @@ class DecoderOnlyTransformer(nn.Module):
         elif self.pos_encoding_type == 'sinusoidal':
             self.pos_encoding = SinusoidalPositionalEncoding(
                 d_model=self.d_model,
-                max_len=self.max_len
+                max_len=self.max_len,
+                scale=self.sinusoidal_scale,
             )
         elif self.pos_encoding_type == 'hybrid':
             self.pos_encoding = HybridPositionalEncoding(
                 d_model=self.d_model,
-                max_len=self.max_len
+                max_len=self.max_len,
+                scale=self.sinusoidal_scale,
             )
         elif self.pos_encoding_type in ['rope', 'alibi', 'relative']:
             # These are handled within attention mechanism
@@ -302,7 +302,7 @@ class DecoderOnlyTransformer(nn.Module):
         # Final LayerNorm before projecting to logits
         self.layerNorm_final = nn.LayerNorm()
 
-        # Optional separate output head if not weight-tying
+        # Separate (untied) output head
         self.project_to_vocab = nn.Dense(self.vocab_size, use_bias=False)
 
     @nn.compact

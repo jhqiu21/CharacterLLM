@@ -12,89 +12,105 @@ def sample_categorical(rng, logits, temperature=1.0):
     return jax.random.categorical(rng, logits, axis=-1)
 
 
-# @functools.partial(jax.jit, static_argnames=("model", "block_size", "temperature", "sample"))
-def generate_tokens(model, params, rng, context, length, block_size=64, temperature=1.0, sample=True, ngram_size=None):
+def initial_window(context, block_size, fill_token=None):
+    """Place the prompt at positions 0..S-1 of a fixed (B, block_size) window.
+
+    Prompts longer than the window keep their last `block_size` tokens. The positions after the
+    prompt only hold a filler (by default the last prompt token repeated; `fill_token` overrides it).
+    The models are causal, so the filler never affects the logits at positions < S that are read.
+    Returns (window, number of real tokens S).
+    """
+    context = jnp.asarray(context, dtype=jnp.int32)
+    assert context.ndim == 2 and context.shape[1] >= 1, "context must have shape (B, S) with S >= 1"
+    context = context[:, -block_size:]
+    S = context.shape[1]
+    if S == block_size:
+        return context, S
+    if fill_token is None:
+        window = jnp.pad(context, ((0, 0), (0, block_size - S)), mode="edge")
+    else:
+        window = jnp.pad(context, ((0, 0), (0, block_size - S)), constant_values=fill_token)
+    return window, S
+
+
+def next_token_logits(model, params, window, cur_len):
+    """Logits (B, V) for the token after the cur_len real tokens at the start of `window`."""
+    logits = model.apply({"params": params}, window, deterministic=True)  # (B, block_size, V)
+    return jax.lax.dynamic_index_in_dim(logits, cur_len - 1, axis=1, keepdims=False)
+
+
+def _advance(window, cur_len, next_token, block_size):
+    """Write `next_token` (B,) at position cur_len, or slide the window left by one once it is full."""
+    written = jax.lax.dynamic_update_slice_in_dim(window, next_token[:, None], jnp.minimum(cur_len, block_size - 1), axis=1)
+    slid = jnp.concatenate([window[:, 1:], next_token[:, None]], axis=1)
+    return jnp.where(cur_len < block_size, written, slid), jnp.minimum(cur_len + 1, block_size)
+
+
+def generate_tokens(model, params, rng, context, length, block_size=64, temperature=1.0, sample=True, ngram_size=None,
+                    fill_token=None):
     """Generate `length` new tokens autoregressively starting from `context`.
 
+    The prompt occupies positions 0..S-1 of a fixed-size window (no padding before it); the logits are
+    read at the last real position cur_len-1 and the sampled token is written at cur_len. Once the window
+    is full it slides by one token per step. Because the models are causal, this conditions exactly on the
+    real tokens, while every forward pass keeps the shape (B, block_size).
+
     Args:
-      model: Flax/linen model object with apply signature model.apply({'params': params}, tokens)
+      model: Flax/linen model object with apply signature model.apply({'params': params}, tokens, deterministic=True)
       params: model parameters pytree.
       rng: jax PRNGKey (e.g., jax.random.PRNGKey(0)).
-      context: int32 array shape (B, S) where S <= block_size. If S < block_size, left-pad with zeros or use full context.
+      context: int32 array shape (B, S), S >= 1. If S > block_size only the last block_size tokens are used.
       length: number of tokens to generate (int).
       block_size: model context window (static).
       temperature: sampling temperature (static).
       sample: if True use sampling; if False use argmax (greedy).
+      ngram_size: if set, block repeated n-grams (slow Python loop, batch size 1 only).
+      fill_token: token placed after the prompt (never read; default: the last prompt token).
 
     Returns:
       generated: int32 array shape (B, length) of generated token ids.
     """
+    context = jnp.asarray(context, dtype=jnp.int32)
     B = context.shape[0]
-    S = context.shape[1]
-    assert S <= block_size, "context length must be <= block_size"
+    window, S = initial_window(context, block_size, fill_token)
+    temp = temperature if temperature > 0 else 1.0
 
-    # initialize running context: if S < block_size, left-pad with zeros (or use a preferred pad token)
     if ngram_size is None:
-        if S < block_size:
-            pad_len = block_size - S
-            context = jnp.concatenate([jnp.zeros((B, pad_len), dtype=jnp.int32), context], axis=1)
-
         def _step(carry, _):
-            rng, ctx = carry  # rng: PRNGKey, ctx: (B, block_size)
-            # forward pass: get logits for all positions, take last position
-            logits = model.apply({"params": params}, ctx, deterministic=True)  # (B, block_size, V)
-            last_logits = logits[:, -1, :]  # (B, V)
+            rng, ctx, cur_len = carry  # ctx: (B, block_size); positions < cur_len hold real tokens
+            last_logits = next_token_logits(model, params, ctx, cur_len)  # (B, V)
             rng, subkey = jax.random.split(rng)
             if sample:
-                next_token = jax.random.categorical(subkey, last_logits / (temperature if temperature > 0 else 1.0), axis=-1)
+                next_token = jax.random.categorical(subkey, last_logits / temp, axis=-1)
             else:
                 next_token = jnp.argmax(last_logits, axis=-1)
             next_token = next_token.astype(jnp.int32)
-            # append to context: drop first token, append new token at end
-            next_token_col = next_token.reshape(B, 1)
-            new_ctx = jnp.concatenate([ctx[:, 1:], next_token_col], axis=1)
-            return (rng, new_ctx), next_token_col
+            ctx, cur_len = _advance(ctx, cur_len, next_token, block_size)
+            return (rng, ctx, cur_len), next_token
 
-        # run scan for `length` steps
-        (rng_final, ctx_final), tokens = jax.lax.scan(_step, (rng, context), None, length=length)
-        # tokens: shape (length, B, 1) -> reshape to (B, length)
-        tokens = tokens.squeeze(-1).transpose(1, 0)
-        return tokens
+        _, tokens = jax.lax.scan(_step, (rng, window, jnp.int32(S)), None, length=length)
+        # tokens: shape (length, B) -> (B, length)
+        return tokens.transpose(1, 0)
 
     assert B == 1, "ngram_size is currently implemented only for batch size 1"
 
-    # history = prompt tokens only (no padding)
+    # history = prompt tokens only (no filler)
     history = list(map(int, context[0].tolist()))
-
-    # prepare padded context for the model
-    if S < block_size:
-        pad_len = block_size - S
-        ctx = jnp.concatenate(
-            [jnp.zeros((B, pad_len), dtype=jnp.int32), context],
-            axis=1
-        )
-    else:
-        ctx = context
-
+    ctx, cur_len = window, S
     generated_tokens = []
 
     for _ in range(length):
-        # forward pass
-        logits = model.apply({"params": params}, ctx, deterministic=True)  # (1, block_size, V)
-        last_logits = logits[:, -1, :][0]  # (V,)
+        # forward pass: logits at the last real position
+        last_logits = next_token_logits(model, params, ctx, cur_len)[0]  # (V,)
 
         # apply n-gram blocking
         if ngram_size is not None and ngram_size > 1:
             last_logits = block_repeated_ngrams(last_logits, history, ngram_size)
 
-        # sampling / greedy
+        # sampling / greedy (same calls and shapes as the scan path, so both paths agree without blocking)
+        rng, subkey = jax.random.split(rng)
         if sample:
-            rng, subkey = jax.random.split(rng)
-            next_token = jax.random.categorical(
-                subkey,
-                last_logits / (temperature if temperature > 0 else 1.0),
-                axis=-1,
-            )
+            next_token = jax.random.categorical(subkey, last_logits[None] / temp, axis=-1)[0]
         else:
             next_token = jnp.argmax(last_logits, axis=-1)
 
@@ -102,9 +118,12 @@ def generate_tokens(model, params, rng, context, length, block_size=64, temperat
         generated_tokens.append(next_token)
         history.append(next_token)
 
-        # update ctx: drop first token, append new one
-        next_token_arr = jnp.array([[next_token]], dtype=jnp.int32)
-        ctx = jnp.concatenate([ctx[:, 1:], next_token_arr], axis=1)
+        # write at cur_len, or slide once the window is full
+        if cur_len < block_size:
+            ctx = ctx.at[0, cur_len].set(next_token)
+            cur_len += 1
+        else:
+            ctx = jnp.concatenate([ctx[:, 1:], jnp.array([[next_token]], dtype=jnp.int32)], axis=1)
 
     # return shape (1, length) to match original interface
     return jnp.array([generated_tokens], dtype=jnp.int32)

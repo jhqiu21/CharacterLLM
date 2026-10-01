@@ -262,8 +262,9 @@ def self_bleu(
     """
     # Generate continuations
     rng_base = jax.random.PRNGKey(seed)
+    # (generate_tokens keeps the last max_len tokens of a longer prompt)
     prompt_int = jnp.array(
-        [[char_to_int.get(c, len(char_set)) for c in prompt.lower()[:config.model.max_len]]],
+        [[char_to_int.get(c, len(char_set)) for c in prompt.lower()]],
         dtype=jnp.int32
     )
     keys = jax.random.split(rng_base, n_samples)
@@ -279,6 +280,13 @@ def self_bleu(
         )
         cont_i = ''.join(int_to_char.get(int(x), '?') for x in list(out_ids_i[0])).strip()
         continuations.append(cont_i)
+    self_sb = self_bleu_from_texts(continuations, n_grams)
+    print(f"\t \tSelf-BLEU-{n_grams}: {self_sb:.4f}")
+    return self_sb
+
+
+def self_bleu_from_texts(continuations, n_grams: int = 4) -> float:
+    """Self-BLEU-n of a list of strings (word tokens): mean BLEU of each text against all the others."""
     texts = [c.split() for c in continuations]
 
     # Compute self-BLEU score
@@ -298,9 +306,54 @@ def self_bleu(
         score = sentence_bleu(refs, cand, weights=weights, smoothing_function=smoothie)
         scores.append(score)
 
-    self_sb = sum(scores) / len(scores)
-    print(f"\t \tSelf-BLEU-{n_grams}: {self_sb:.4f}")
-    return self_sb
+    return sum(scores) / len(scores)
+
+
+def self_bleu_multi_prompt(
+    model,
+    params,
+    prompts,
+    int_to_char: dict,
+    block_size: int,
+    gen_len: int,
+    temperature: float,
+    sample: bool,
+    seed: int,
+    n_grams: int = 4,
+    n_samples: int = 20,
+    ngram_size=None) -> dict:
+    """Self-BLEU-n within the `n_samples` continuations of each prompt, then mean / std over prompts.
+
+    prompts: int array (P, L). Prompt p uses key fold_in(PRNGKey(seed), p); its samples are drawn as one
+    batch of n_samples (or one at a time with split keys when ngram_size is set, which needs batch size 1).
+    std is the sample std (ddof=1) over the P per-prompt scores.
+    """
+    prompts = np.asarray(prompts, dtype=np.int32)
+    per_prompt = []
+    for p, prompt in enumerate(prompts):
+        key = jax.random.fold_in(jax.random.PRNGKey(seed), p)
+        if ngram_size is None:
+            context = jnp.asarray(np.repeat(prompt[None], n_samples, axis=0))
+            out = np.asarray(generate_tokens(model, params, key, context, gen_len, block_size=block_size,
+                                             temperature=temperature, sample=sample))
+        else:
+            out = np.concatenate([
+                np.asarray(generate_tokens(model, params, k, jnp.asarray(prompt[None]), gen_len, block_size=block_size,
+                                           temperature=temperature, sample=sample, ngram_size=ngram_size))
+                for k in jax.random.split(key, n_samples)
+            ])
+        texts = [''.join(int_to_char.get(int(x), '?') for x in row).strip() for row in out]
+        per_prompt.append(self_bleu_from_texts(texts, n_grams))
+    scores = np.array(per_prompt)
+    result = {
+        "mean": float(scores.mean()),
+        "std": float(scores.std(ddof=1)) if len(scores) > 1 else 0.0,
+        "per_prompt": [float(x) for x in scores],
+        "n_prompts": int(len(scores)),
+        "n_samples": int(n_samples),
+    }
+    print(f"\t \tSelf-BLEU-{n_grams} (multi-prompt, {len(scores)} x {n_samples}): {result['mean']:.4f} +- {result['std']:.4f}")
+    return result
 
 
 def distinct_n(tokens, n=2):

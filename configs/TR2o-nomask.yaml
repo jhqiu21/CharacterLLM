@@ -17,6 +17,9 @@ model:
   resid_dropout: 0.1
   # position encoding type: 'sinusoidal', 'learned', 'hybrid', 'rope', 'alibi', 'relative'
   pos_encoding_type: 'rope'
+  # scaling of the fixed sinusoidal table ('sinusoidal' and the sinusoidal half of 'hybrid'):
+  # 'unit' = every row has norm 1 (default); 'raw' = unscaled, row norm sqrt(d_model/2) (~11.3 at d_model 256)
+  sinusoidal_scale: unit
 
 loss:
   LABEL_SMOOTHING: True
@@ -64,6 +67,13 @@ evaluation:
   # sliding-window test evaluation (utils/full_context_eval.py): window = model.max_len
   full_context_stride: 1
   full_context_batch_size: 8192
+  # multi-prompt Self-BLEU: n_prompts passages of prompt_len chars from the validation split (fixed offsets, seed 0),
+  # n_samples continuations per prompt (one batch); Self-BLEU within each prompt, mean +- std over prompts
+  self_bleu_multi_n_prompts: 10
+  self_bleu_multi_n_samples: 20
+  self_bleu_multi_prompt_len: 128
+  # --tuning: full-context evaluation of the validation split with this stride (the test file is never opened)
+  tuning_val_stride: 8
 
 output:
   # directory to save model checkpoints

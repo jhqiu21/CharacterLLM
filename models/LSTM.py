@@ -22,6 +22,7 @@ class CharLSTM(nn.Module):
     dropout: float
     max_len: int
     tie_weights: bool = False  # if True: use E^T for projection
+    forget_bias: float = 1.0   # initial forget-gate bias (Gers et al. 2000); 0.0 = the original all-zero bias
 
     @nn.compact
     def __call__(self, idx: jnp.ndarray, *, deterministic: bool) -> jnp.ndarray:
@@ -44,11 +45,15 @@ class CharLSTM(nn.Module):
         #    where gates split into (i, f, g, o)
         Wx = []  # input-to-gates weights: (H, 4H)
         Wh = []  # hidden-to-gates weights: (H, 4H)
-        b = []   # gates bias: (4H,)
+        b = []   # gates bias: (4H,), zeros except the forget-gate slice [H:2H] = forget_bias
+
+        def bias_init(key, shape, dtype=jnp.float32):
+            return jnp.zeros(shape, dtype).at[H:2 * H].set(self.forget_bias)
+
         for i in range(self.n_layers):
             Wx.append(self.param(f"Wx_{i}", nn.initializers.lecun_normal(), (H, 4 * H)))
             Wh.append(self.param(f"Wh_{i}", nn.initializers.orthogonal(), (H, 4 * H)))
-            b.append(self.param(f"b_{i}", nn.initializers.zeros, (4 * H,)))
+            b.append(self.param(f"b_{i}", bias_init, (4 * H,)))
 
         # 3) Variational dropout masks (one per layer, shared across time)
         #    This avoids calling nn.Dropout inside scan.

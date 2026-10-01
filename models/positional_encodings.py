@@ -22,14 +22,29 @@ def get_sinusoidal_embeddings(max_len: int, d_model: int) -> jnp.ndarray:
     return pe
 
 
+SINUSOIDAL_SCALES = ("unit", "raw")
+
+
+def sinusoidal_scale_factor(scale: str, d_model: int) -> float:
+    """Multiplier for the sinusoidal table. Every raw row has norm sqrt(d_model/2) (d_model/2 sin/cos
+    pairs), ~11.3 for d_model=256 against ~1 for a token embedding row. 'unit' rescales rows to norm 1;
+    'raw' keeps the original (unscaled) table."""
+    if scale == "unit":
+        return 1.0 / math.sqrt(d_model / 2)
+    if scale == "raw":
+        return 1.0
+    raise ValueError(f"sinusoidal_scale must be one of {SINUSOIDAL_SCALES}, got {scale!r}")
+
+
 class SinusoidalPositionalEncoding(nn.Module):
 
     d_model: int
     max_len: int
+    scale: str = "unit"
 
     def setup(self):
         # Pre-compute sinusoidal encodings (not learnable)
-        self.pe = get_sinusoidal_embeddings(self.max_len, self.d_model)
+        self.pe = get_sinusoidal_embeddings(self.max_len, self.d_model) * sinusoidal_scale_factor(self.scale, self.d_model)
 
     def __call__(self, x):
         # x: Input embeddings of shape (B, T, D)
@@ -129,10 +144,6 @@ class ALiBiPositionalBias(nn.Module):
     n_heads: int
     max_len: int
 
-    def setup(self):
-        # Precompute slopes (these are fixed, not learned)
-        self.slopes = get_alibi_slopes(self.n_heads)
-
     def __call__(self, seq_len: int):
         """Generate bias for given sequence length."""
         return get_alibi_bias(self.n_heads, seq_len)
@@ -145,6 +156,7 @@ class HybridPositionalEncoding(nn.Module):
     d_model: int
     max_len: int
     learned_weight: float = 0.5  # Weight for learned component
+    scale: str = "unit"  # scaling of the sinusoidal component, see sinusoidal_scale_factor
 
     def setup(self):
         # Learned component
@@ -155,7 +167,7 @@ class HybridPositionalEncoding(nn.Module):
         )
 
         # Sinusoidal component (fixed)
-        self.sinusoidal_embed = get_sinusoidal_embeddings(self.max_len, self.d_model)
+        self.sinusoidal_embed = get_sinusoidal_embeddings(self.max_len, self.d_model) * sinusoidal_scale_factor(self.scale, self.d_model)
 
     def __call__(self, x):
         T = x.shape[1]
@@ -187,22 +199,3 @@ class RelativePositionalEncoding(nn.Module):
 
     def __call__(self):
         return self.rel_embed
-
-
-def get_positional_encoding(pe_type, d_model, max_len, n_heads=None):
-    if pe_type == 'learned':
-        # default positional embedding in baseline model
-        return None
-    elif pe_type == 'sinusoidal':
-        return SinusoidalPositionalEncoding(d_model=d_model, max_len=max_len)
-    elif pe_type == 'rope':
-        head_dim = d_model // n_heads
-        return RotaryPositionalEmbedding(head_dim=head_dim, max_len=max_len)
-    elif pe_type == 'alibi':
-        return ALiBiPositionalBias(n_heads=n_heads, max_len=max_len)
-    elif pe_type == 'hybrid':
-        return HybridPositionalEncoding(d_model=d_model, max_len=max_len)
-    elif pe_type == 'relative':
-        return RelativePositionalEncoding(d_model=d_model, max_len=max_len)
-    else:
-        raise ValueError(f"Unknown positional encoding type: {pe_type}")
