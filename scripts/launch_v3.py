@@ -53,6 +53,14 @@ def build_queue():
     return [(b, k, n, c, e + FC_BATCH) for b, k, n, c, e in q]
 
 
+def gpu_env(gpu):
+    """Environment for a run on `gpu`. /usr/local/cuda* is dropped from LD_LIBRARY_PATH (its libnvJitLink makes the
+    CUDA plugin fail and JAX silently fall back to the CPU), and JAX_PLATFORMS=cuda turns any such failure into an error."""
+    ld = ":".join(p for p in os.environ.get("LD_LIBRARY_PATH", "").split(":") if p and not p.startswith("/usr/local/cuda"))
+    return dict(os.environ, CUDA_VISIBLE_DEVICES=str(gpu), CUDA_DEVICE_ORDER="PCI_BUS_ID", XLA_PYTHON_CLIENT_PREALLOCATE="false",
+                JAX_PLATFORMS="cuda", LD_LIBRARY_PATH=ld)
+
+
 def is_done(run_name):
     run_dir = ROOT / "runs" / run_name
     for fname in ("eval.json", "val_eval.json"):
@@ -130,8 +138,7 @@ def main():
             run_dir = ROOT / "runs" / name
             run_dir.mkdir(parents=True, exist_ok=True)
             cmd = [sys.executable, "train.py", "--config", cfg, "--run-name", name] + extra
-            env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(gpu), CUDA_DEVICE_ORDER="PCI_BUS_ID",
-                       XLA_PYTHON_CLIENT_PREALLOCATE="false")
+            env = gpu_env(gpu)
             log = open(run_dir / "launcher.txt", "w")
             proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
             running[gpu] = {"block": block, "kind": kind, "name": name, "cmd": " ".join(cmd), "proc": proc, "log": log,
