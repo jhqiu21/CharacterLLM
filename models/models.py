@@ -59,6 +59,15 @@ class MultiHeadAttentionWithPE(nn.Module):
     - RoPE to be applied to Q and K
     - ALiBi/Relative biases to be added to attention scores
     For 'learned', 'sinusoidal' and 'hybrid' (applied to the embeddings) it is plain causal attention.
+
+    Evaluation-only options (the defaults leave training, outputs and parameters unchanged):
+    - capture_attn: sow the post-softmax attention weights (B, H, T, T) into the 'intermediates'
+      collection as 'attn_weights' (call apply with mutable=['intermediates']).
+    - rel_table_len: length the 'relative' table was trained for (its rel_embed has 2*rel_table_len-1
+      columns); 0 means max_len. Lets a model rebuilt with a larger max_len load the trained table.
+    - rel_clamp: clamp relative offsets to +-(rel_table_len-1) (T5-style), so 'relative' runs on sequences
+      longer than rel_table_len. Offsets inside the table are untouched, so for T <= rel_table_len the
+      output is identical with or without the clamp.
     """
 
     d_model: int
@@ -66,6 +75,9 @@ class MultiHeadAttentionWithPE(nn.Module):
     attn_dropout: float
     pos_encoding_type: str
     max_len: int
+    capture_attn: bool = False
+    rel_table_len: int = 0
+    rel_clamp: bool = False
 
     def setup(self):
         self.head_dim = self.d_model // self.n_heads
@@ -81,7 +93,7 @@ class MultiHeadAttentionWithPE(nn.Module):
         if self.pos_encoding_type == "relative":
             self.rel_bias = RelativePositionalEncoding(
                 n_heads=self.n_heads,
-                max_len=self.max_len
+                max_len=self.rel_table_len or self.max_len
             )
         elif self.pos_encoding_type == 'rope':
             self.rope = RotaryPositionalEmbedding(
@@ -135,9 +147,16 @@ class MultiHeadAttentionWithPE(nn.Module):
             alibi_bias = self.alibi(T)  # (H, T, T)
             attn_scores = attn_scores + alibi_bias[None, :, :, :]  # (B, H, T, T)
         elif self.pos_encoding_type == 'relative':
+            table_len = self.rel_table_len or self.max_len
+            if T > table_len and not self.rel_clamp:
+                raise ValueError(f"'relative' was trained for offsets up to {table_len - 1}; sequence length {T} "
+                                 f"needs rel_clamp=True")
             pos = jnp.arange(T)
-            rel_idx = pos[:, None] - pos[None, :] + (self.max_len - 1)  # (T, T)
-            bias_matrix = self.rel_bias()  # call the module to get (H, 2*max_len-1)
+            offset = pos[:, None] - pos[None, :]  # (T, T), i - j
+            if self.rel_clamp:
+                offset = jnp.clip(offset, -(table_len - 1), table_len - 1)
+            rel_idx = offset + (table_len - 1)
+            bias_matrix = self.rel_bias()  # call the module to get (H, 2*table_len-1)
             bias = bias_matrix[:, rel_idx]  # (H, T, T)
             attn_scores = attn_scores + bias[None, :, :, :]  # (B, H, T, T)
 
@@ -149,6 +168,8 @@ class MultiHeadAttentionWithPE(nn.Module):
 
         # Softmax
         attn_weights = jax.nn.softmax(attn_scores, axis=-1)
+        if self.capture_attn:
+            self.sow('intermediates', 'attn_weights', attn_weights)
 
         # Dropout on attention weights
         attn_weights = nn.Dropout(rate=self.attn_dropout)(
@@ -189,6 +210,9 @@ class DecoderBlock(nn.Module):
     mlp_ratio: int
     pos_encoding_type: str
     max_len: int
+    capture_attn: bool = False
+    rel_table_len: int = 0
+    rel_clamp: bool = False
 
     @nn.compact
     def __call__(self, x, *, mask=None, deterministic: bool):
@@ -201,7 +225,10 @@ class DecoderBlock(nn.Module):
             n_heads=self.n_heads,
             attn_dropout=self.attn_dropout,
             pos_encoding_type=self.pos_encoding_type,
-            max_len=self.max_len
+            max_len=self.max_len,
+            capture_attn=self.capture_attn,
+            rel_table_len=self.rel_table_len,
+            rel_clamp=self.rel_clamp,
         )(h, mask=mask, deterministic=deterministic)
 
         h = nn.Dropout(rate=self.resid_dropout)(h, deterministic=deterministic)
@@ -253,6 +280,10 @@ class DecoderOnlyTransformer(nn.Module):
     resid_dropout: float      # post-attention/MLP dropout
     pos_encoding_type: str    # positional encoding type: 'learned', 'sinusoidal', 'hybrid', 'rope', 'alibi', 'relative'
     sinusoidal_scale: str = "unit"  # 'unit' or 'raw' (see positional_encodings.sinusoidal_scale_factor)
+    # Evaluation-only options, see MultiHeadAttentionWithPE (defaults leave training unchanged).
+    capture_attn: bool = False
+    rel_table_len: int = 0
+    rel_clamp: bool = False
 
     def setup(self):
         # Token embedding table E with shape (V, D)
@@ -295,7 +326,10 @@ class DecoderOnlyTransformer(nn.Module):
                   attn_dropout=self.attn_dropout,
                   resid_dropout=self.resid_dropout,
                   pos_encoding_type=self.pos_encoding_type,
-                  max_len=self.max_len
+                  max_len=self.max_len,
+                  capture_attn=self.capture_attn,
+                  rel_table_len=self.rel_table_len,
+                  rel_clamp=self.rel_clamp,
             ) for _ in range(self.n_layers)
         ]
 
@@ -316,6 +350,9 @@ class DecoderOnlyTransformer(nn.Module):
           logits: (B, T, V) unnormalized vocabulary scores for next-token prediction.
         """
         B, T = idx.shape
+        if T > self.max_len and self.pos_encoding_type in ('learned', 'hybrid'):
+            raise ValueError(f"pos_encoding_type {self.pos_encoding_type!r} has a learned table of {self.max_len} positions; "
+                             f"it cannot be evaluated on sequences of length {T}")
 
         # Token embeddings
         x = self.tok_embed(idx)

@@ -208,8 +208,12 @@ def apply_overrides(d, assignments):
     return applied
 
 
-def build_model(config):
+def build_model(config, **eval_options):
+    """eval_options: evaluation-only keyword arguments of DecoderOnlyTransformer (capture_attn, rel_table_len,
+    rel_clamp); the defaults build the training model."""
     m = config.model
+    if eval_options and m.type != "transformer":
+        raise ValueError(f"eval_options {sorted(eval_options)} apply to transformers only")
     if m.type == "transformer":
         return transformer_models.DecoderOnlyTransformer(
             vocab_size=m.vocab_size,
@@ -224,6 +228,7 @@ def build_model(config):
             resid_dropout=m.resid_dropout,
             pos_encoding_type=m.pos_encoding_type,
             sinusoidal_scale=getattr(m, "sinusoidal_scale", MODEL_DEFAULTS["transformer"]["sinusoidal_scale"]),
+            **eval_options,
         )
     if m.type == "lstm":
         return lstm_models.CharLSTM(
