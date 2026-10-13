@@ -1,0 +1,63 @@
+model_name: LR-2
+model:
+  type: lstm
+  vocab_size: 27
+  hidden_size: 314
+  n_layers: 4
+  max_len: 128
+  dropout: 0.0
+  forget_bias: 1.0
+loss:
+  LABEL_SMOOTHING: true
+  ls_eps: 0.05
+  entropy_lambda: 0.0
+  tail_scheme: linear
+scheduler:
+  warmup_iters: 2000
+  init_value: 0.0
+  end_value: 0.0
+optimizer:
+  b1: 0.9
+  b2: 0.95
+  eps: 1.0e-08
+  weight_decay: 0.1
+  grad_clip_norm: 1.0
+  decay_mask: true
+training:
+  batch_size: 128
+  sequence_length: 128
+  learning_rate: 0.0004
+  epochs: 10000
+  validation_interval: 500
+  stage_checkpoint_interval: 10000
+  seed: 4212
+evaluation:
+  sample: true
+  seed: 4212
+  prompt: hello my fri
+  gen_len: 1000
+  temperature: 0.7
+  self_belu_n_grams: 4
+  self_belu_n_samples: 20
+  full_context_stride: 1
+  full_context_batch_size: 8192
+  self_bleu_multi_n_prompts: 10
+  self_bleu_multi_n_samples: 20
+  self_bleu_multi_prompt_len: 128
+  tuning_val_stride: 8
+output:
+  checkpoint_dir: ./checkpoints
+  results_dir: ./runs
+run:
+  run_name: tune_LSTM_lr4e-4_d0.0
+  seed: 4212
+  legacy_dropout_rng: false
+  tuning: true
+  config_file: configs/LR-2.yaml
+  overrides:
+    training.epochs: 10000
+    scheduler.warmup_iters: 2000
+    training.validation_interval: 500
+    training.learning_rate: 0.0004
+    model.dropout: 0.0
+  git_commit: 10b7ecc1312022e2131463b59882a152f9e955ab

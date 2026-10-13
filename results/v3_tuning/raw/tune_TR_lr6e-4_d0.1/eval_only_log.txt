@@ -1,0 +1,104 @@
+WARNING:absl:Tensorflow library not found, tensorflow.io.gfile operations will use native shim calls. GCS paths (i.e. 'gs://...') cannot be accessed.
+Run tune_TR_lr6e-4_d0.1: config configs/TR2o.yaml, seed 4212, devices [CudaDevice(id=0)], CUDA_VISIBLE_DEVICES=0, eval_only=True, tuning=True
+{
+  "model_name": "TR2o",
+  "model": {
+    "type": "transformer",
+    "vocab_size": 27,
+    "d_model": 256,
+    "n_heads": 4,
+    "n_layers": 4,
+    "max_len": 128,
+    "mlp_ratio": 4,
+    "emb_dropout": 0.1,
+    "mlp_dropout": 0.1,
+    "attn_dropout": 0.1,
+    "resid_dropout": 0.1,
+    "pos_encoding_type": "rope",
+    "sinusoidal_scale": "unit"
+  },
+  "loss": {
+    "LABEL_SMOOTHING": true,
+    "ls_eps": 0.05,
+    "entropy_lambda": 0.0,
+    "tail_scheme": "linear"
+  },
+  "scheduler": {
+    "warmup_iters": 2000,
+    "init_value": 0.0,
+    "end_value": 0.0
+  },
+  "optimizer": {
+    "b1": 0.9,
+    "b2": 0.95,
+    "eps": 1e-08,
+    "weight_decay": 0.1,
+    "grad_clip_norm": 1.0,
+    "decay_mask": true
+  },
+  "training": {
+    "batch_size": 128,
+    "sequence_length": 128,
+    "learning_rate": 0.0006,
+    "epochs": 10000,
+    "validation_interval": 500,
+    "stage_checkpoint_interval": 10000,
+    "seed": 4212
+  },
+  "evaluation": {
+    "sample": true,
+    "seed": 4212,
+    "prompt": "hello my fri",
+    "gen_len": 1000,
+    "temperature": 0.7,
+    "self_belu_n_grams": 4,
+    "self_belu_n_samples": 20,
+    "full_context_stride": 1,
+    "full_context_batch_size": 8192,
+    "self_bleu_multi_n_prompts": 10,
+    "self_bleu_multi_n_samples": 20,
+    "self_bleu_multi_prompt_len": 128,
+    "tuning_val_stride": 8
+  },
+  "output": {
+    "checkpoint_dir": "./checkpoints",
+    "results_dir": "./runs"
+  },
+  "run": {
+    "run_name": "tune_TR_lr6e-4_d0.1",
+    "seed": 4212,
+    "legacy_dropout_rng": false,
+    "tuning": true,
+    "config_file": "configs/TR2o.yaml",
+    "overrides": {
+      "training.epochs": 10000,
+      "scheduler.warmup_iters": 2000,
+      "training.validation_interval": 500,
+      "training.learning_rate": 0.0006,
+      "model.emb_dropout": 0.1,
+      "model.attn_dropout": 0.1,
+      "model.resid_dropout": 0.1,
+      "model.mlp_dropout": 0.1
+    },
+    "git_commit": "10b7ecc1312022e2131463b59882a152f9e955ab",
+    "eval_git_commit": "10b7ecc1312022e2131463b59882a152f9e955ab"
+  }
+}
+train 85_500_000 / val 4_500_000 / test NOT LOADED (tuning mode) characters
+2026-10-13 19:54:15.788349: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+/home/kaiwen/anaconda3/envs/charllm-gpu/lib/python3.10/site-packages/orbax/checkpoint/_src/serialization/jax_array_handlers.py:736: UserWarning: Sharding info not provided when restoring. Populating sharding info from sharding file. Please note restoration time will be slightly increased due to reading from file. Note also that this option is unsafe when restoring on a different topology than the checkpoint was saved with.
+  warnings.warn(
+	 full-context eval: batch 6/69 (15s)
+	 full-context eval: batch 12/69 (15s)
+	 full-context eval: batch 18/69 (16s)
+	 full-context eval: batch 24/69 (19s)
+	 full-context eval: batch 30/69 (22s)
+	 full-context eval: batch 36/69 (24s)
+	 full-context eval: batch 42/69 (27s)
+	 full-context eval: batch 48/69 (30s)
+	 full-context eval: batch 54/69 (32s)
+	 full-context eval: batch 60/69 (35s)
+	 full-context eval: batch 66/69 (44s)
+	 validation full_context (W=128, S=8, 46s): BPC 1.8041, acc 61.26%, ECE 0.0096
+
+Done: /home/kaiwen/VLM/CharacterLLM/runs/tune_TR_lr6e-4_d0.1/val_eval.json

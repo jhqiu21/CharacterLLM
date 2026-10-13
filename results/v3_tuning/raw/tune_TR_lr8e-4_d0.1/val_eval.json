@@ -1,0 +1,266 @@
+{
+  "run_name": "tune_TR_lr8e-4_d0.1",
+  "model_name": "TR2o",
+  "model_type": "transformer",
+  "pos_encoding_type": "rope",
+  "seed": 4212,
+  "legacy_dropout_rng": false,
+  "decay_mask": true,
+  "num_params": 3169280,
+  "config_file": "configs/TR2o.yaml",
+  "overrides": {
+    "training.epochs": 10000,
+    "scheduler.warmup_iters": 2000,
+    "training.validation_interval": 500,
+    "training.learning_rate": 0.0008,
+    "model.emb_dropout": 0.1,
+    "model.attn_dropout": 0.1,
+    "model.resid_dropout": 0.1,
+    "model.mlp_dropout": 0.1
+  },
+  "git_commit": "10b7ecc1312022e2131463b59882a152f9e955ab",
+  "eval_git_commit": "10b7ecc1312022e2131463b59882a152f9e955ab",
+  "device": "NVIDIA A100 80GB PCIe",
+  "split": "validation",
+  "frequency_groups": {
+    "rare_ids": [
+      16,
+      9,
+      23,
+      25,
+      10
+    ],
+    "common_ids": [
+      13,
+      0,
+      19,
+      4,
+      26
+    ],
+    "rare": [
+      {
+        "id": 16,
+        "char": "q",
+        "train_freq": 0.0008651461988304094
+      },
+      {
+        "id": 9,
+        "char": "j",
+        "train_freq": 0.0016696608187134502
+      },
+      {
+        "id": 23,
+        "char": "x",
+        "train_freq": 0.002931719298245614
+      },
+      {
+        "id": 25,
+        "char": "z",
+        "train_freq": 0.0036927251461988304
+      },
+      {
+        "id": 10,
+        "char": "k",
+        "train_freq": 0.004894339181286549
+      }
+    ],
+    "common": [
+      {
+        "id": 13,
+        "char": "n",
+        "train_freq": 0.06582063157894737
+      },
+      {
+        "id": 0,
+        "char": "a",
+        "train_freq": 0.06608659649122807
+      },
+      {
+        "id": 19,
+        "char": "t",
+        "train_freq": 0.06954843274853802
+      },
+      {
+        "id": 4,
+        "char": "e",
+        "train_freq": 0.10664908771929825
+      },
+      {
+        "id": 26,
+        "char": " ",
+        "train_freq": 0.1699996842105263
+      }
+    ],
+    "top_percent": 0.2,
+    "n_per_group": 5
+  },
+  "throughput": {
+    "s_per_step_median": 0.03465806250460446,
+    "tokens_per_s": 472732.71544891817,
+    "timing_iterations": "iterations [1000, 2000) excluding validation iterations",
+    "n_timed_steps": 998,
+    "s_per_step_mean_all_iterations_incl_validation": 0.03484008405208588,
+    "total_train_time_s": 348.40084052085876,
+    "batch_size": 128,
+    "sequence_length": 128,
+    "device": "NVIDIA A100 80GB PCIe",
+    "cuda_visible_devices": "0",
+    "peak_device_memory_gib_training": 1.84
+  },
+  "checkpoints": {
+    "best_loss_all_": {
+      "step": 9999,
+      "val_loss": 1.2711912393569946,
+      "val_bpc": 1.8339412212371826,
+      "val_perplexity": 3.565096855163574,
+      "val_acc": 0.6065826416015625,
+      "val_acc_last": 0.615234375,
+      "ECE": 0.010718954727053642,
+      "full_context": {
+        "bpc": 1.7831711136392827,
+        "loss": 1.2360000298750067,
+        "perplexity": 3.4418187218126524,
+        "acc": 0.6169139148697589,
+        "ece": 0.009601719798646066,
+        "acc_rare": 0.4165242999625779,
+        "acc_common": 0.7532625046747101,
+        "n_scored": 4499999,
+        "n_targets_expected": 4499999,
+        "window": 128,
+        "stride": 8,
+        "min_context_after_first_window": 121,
+        "n_windows": 562485,
+        "batch_size": 8192,
+        "seconds": 33.595619440078735,
+        "ece_bins": {
+          "n_bins": 20,
+          "count": [
+            0,
+            53128,
+            238915,
+            256746,
+            210327,
+            215065,
+            231040,
+            215655,
+            197072,
+            193659,
+            176382,
+            150035,
+            140318,
+            136255,
+            142529,
+            159381,
+            179350,
+            224679,
+            375477,
+            1003986
+          ],
+          "conf_sum": [
+            0.0,
+            4982.748443603516,
+            29882.83837890625,
+            44898.41134643555,
+            47160.229064941406,
+            59258.5947265625,
+            75093.97369384766,
+            80759.28643798828,
+            83698.5991821289,
+            92034.59649658203,
+            92460.42315673828,
+            86198.54620361328,
+            87687.7974243164,
+            91972.12268066406,
+            103390.7974243164,
+            123580.47521972656,
+            148081.78149414062,
+            196954.23669433594,
+            347968.52099609375,
+            974809.560546875
+          ],
+          "correct_sum": [
+            0,
+            5099,
+            30019,
+            44006,
+            46578,
+            57334,
+            74064,
+            79844,
+            82586,
+            91089,
+            91854,
+            85013,
+            85822,
+            90131,
+            101064,
+            121167,
+            146739,
+            197289,
+            351599,
+            994815
+          ]
+        },
+        "class_count": [
+          298332,
+          53593,
+          123588,
+          126976,
+          473344,
+          87599,
+          74068,
+          159499,
+          294485,
+          6298,
+          21718,
+          163296,
+          101033,
+          295501,
+          290967,
+          74827,
+          4201,
+          243247,
+          245145,
+          310565,
+          100025,
+          44358,
+          56142,
+          13794,
+          55172,
+          15450,
+          766776
+        ],
+        "class_correct": [
+          154722,
+          14010,
+          52950,
+          75081,
+          340164,
+          35075,
+          42113,
+          112361,
+          141319,
+          360,
+          8955,
+          75812,
+          33874,
+          217494,
+          162340,
+          21664,
+          291,
+          149422,
+          113571,
+          203487,
+          39059,
+          19357,
+          13118,
+          7908,
+          34001,
+          8086,
+          699518
+        ]
+      }
+    }
+  },
+  "peak_device_memory_gib": 10.06
+}

@@ -1,0 +1,69 @@
+[2026-10-13 15:17:07] 0 runs finished; GPU 0: {'mem_used': 4, 'mem_total': 81920, 'free': 81916, 'pids': []}
+Pending now:
+  tune_LSTM_lr4e-4_d0.0 (grid)
+  tune_LSTM_lr4e-4_d0.1 (grid)
+  tune_LSTM_lr8e-4_d0.0 (grid)
+  tune_LSTM_lr8e-4_d0.1 (grid)
+  tune_LSTM_lr1.6e-3_d0.0 (grid)
+  tune_LSTM_lr1.6e-3_d0.1 (grid)
+  tune_LSTM_lr3.2e-3_d0.0 (grid)
+  tune_LSTM_lr3.2e-3_d0.1 (grid)
+  tune_TR_lr4e-4_d0.0 (grid)
+  tune_TR_lr4e-4_d0.1 (grid)
+  tune_TR_lr6e-4_d0.0 (grid)
+  tune_TR_lr6e-4_d0.1 (grid)
+  tune_TR_lr8e-4_d0.0 (grid)
+  tune_TR_lr8e-4_d0.1 (grid)
+  tune_TR_lr1.2e-3_d0.0 (grid)
+  tune_TR_lr1.2e-3_d0.1 (grid)
+[2026-10-13 15:17:07] started tune_LSTM_lr4e-4_d0.0 (grid; 1 running; GPU free 81916 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr4e-4_d0.0 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0004 --set model.dropout=0.0
+[2026-10-13 15:18:08] started tune_LSTM_lr4e-4_d0.1 (grid; 2 running; GPU free 79129 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr4e-4_d0.1 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0004 --set model.dropout=0.1
+[2026-10-13 15:40:12] finished tune_LSTM_lr4e-4_d0.0: rc=0, done, val BPC 1.9218
+[2026-10-13 15:40:12] started tune_LSTM_lr8e-4_d0.0 (grid; 2 running; GPU free 79129 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr8e-4_d0.0 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0008 --set model.dropout=0.0
+[2026-10-13 15:41:13] finished tune_LSTM_lr4e-4_d0.1: rc=0, done, val BPC 1.9003
+[2026-10-13 15:41:13] started tune_LSTM_lr8e-4_d0.1 (grid; 2 running; GPU free 79129 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr8e-4_d0.1 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0008 --set model.dropout=0.1
+[2026-10-13 16:03:29] finished tune_LSTM_lr8e-4_d0.0: rc=0, done, val BPC 1.8182
+[2026-10-13 16:03:29] started tune_LSTM_lr1.6e-3_d0.0 (grid; 2 running; GPU free 79129 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr1.6e-3_d0.0 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0016 --set model.dropout=0.0
+[2026-10-13 16:04:10] finished tune_LSTM_lr8e-4_d0.1: rc=0, done, val BPC 1.8162
+[2026-10-13 16:04:30] started tune_LSTM_lr1.6e-3_d0.1 (grid; 2 running; GPU free 79129 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr1.6e-3_d0.1 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0016 --set model.dropout=0.1
+[2026-10-13 16:27:37] finished tune_LSTM_lr1.6e-3_d0.0: rc=0, done, val BPC 1.7424
+[2026-10-13 16:28:59] finished tune_LSTM_lr1.6e-3_d0.1: rc=0, done, val BPC 1.7526
+[2026-10-13 16:28:59] started tune_LSTM_lr3.2e-3_d0.0 (grid; 1 running; GPU free 32475 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr3.2e-3_d0.0 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0032 --set model.dropout=0.0
+[2026-10-13 16:47:44] finished tune_LSTM_lr3.2e-3_d0.0: rc=0, done, val BPC 1.6874
+[2026-10-13 16:48:05] started tune_LSTM_lr3.2e-3_d0.1 (grid; 1 running; GPU free 32499 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr3.2e-3_d0.1 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0032 --set model.dropout=0.1
+[2026-10-13 17:08:25] finished tune_LSTM_lr3.2e-3_d0.1: rc=0, done, val BPC 1.7163
+[2026-10-13 17:41:11] started tune_LSTM_lr4.8e-3_d0.0 (edge; 1 running; GPU free 32509 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr4.8e-3_d0.0 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0048 --set model.dropout=0.0
+[2026-10-13 17:55:47] started tune_LSTM_lr7.2e-3_d0.0 (edge; 2 running; GPU free 46223 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr7.2e-3_d0.0 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0072 --set model.dropout=0.0
+[2026-10-13 17:59:11] finished tune_LSTM_lr4.8e-3_d0.0: rc=0, done, val BPC 1.6760
+[2026-10-13 18:13:47] finished tune_LSTM_lr7.2e-3_d0.0: rc=0, done, val BPC 1.6677
+[2026-10-13 18:13:47] started tune_LSTM_lr3.2e-3_d0.0_ls0 (ls; 1 running; GPU free 32547 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_LSTM_lr3.2e-3_d0.0_ls0 --config configs/LR-2.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0032 --set model.dropout=0.0 --set loss.ls_eps=0.0
+[2026-10-13 18:30:25] started tune_TR_lr4e-4_d0.0 (grid; 2 running; GPU free 32064 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr4e-4_d0.0 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0004 --set model.emb_dropout=0.0 --set model.attn_dropout=0.0 --set model.resid_dropout=0.0 --set model.mlp_dropout=0.0
+[2026-10-13 18:30:45] finished tune_LSTM_lr3.2e-3_d0.0_ls0: rc=0, done, val BPC 1.6503
+[2026-10-13 18:35:51] finished tune_TR_lr4e-4_d0.0: rc=0, done, val BPC 1.7753
+[2026-10-13 18:35:51] started tune_TR_lr4e-4_d0.1 (grid; 1 running; GPU free 32421 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr4e-4_d0.1 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0004 --set model.emb_dropout=0.1 --set model.attn_dropout=0.1 --set model.resid_dropout=0.1 --set model.mlp_dropout=0.1
+[2026-10-13 18:41:39] finished tune_TR_lr4e-4_d0.1: rc=0, done, val BPC 1.8423
+[2026-10-13 18:41:39] started tune_TR_lr6e-4_d0.0 (grid; 1 running; GPU free 32345 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr6e-4_d0.0 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0006 --set model.emb_dropout=0.0 --set model.attn_dropout=0.0 --set model.resid_dropout=0.0 --set model.mlp_dropout=0.0
+[2026-10-13 18:47:05] finished tune_TR_lr6e-4_d0.0: rc=0, done, val BPC 1.7452
+[2026-10-13 18:47:05] started tune_TR_lr6e-4_d0.1 (grid; 1 running; GPU free 32633 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr6e-4_d0.1 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0006 --set model.emb_dropout=0.1 --set model.attn_dropout=0.1 --set model.resid_dropout=0.1 --set model.mlp_dropout=0.1
+[2026-10-13 18:54:15] finished tune_TR_lr6e-4_d0.1: rc=1, failed
+[2026-10-13 19:28:32] started tune_TR_lr8e-4_d0.0 (grid; 1 running; GPU free 32353 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr8e-4_d0.0 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0008 --set model.emb_dropout=0.0 --set model.attn_dropout=0.0 --set model.resid_dropout=0.0 --set model.mlp_dropout=0.0
+[2026-10-13 19:31:15] started tune_TR_lr8e-4_d0.1 (grid; 2 running; GPU free 45867 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr8e-4_d0.1 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0008 --set model.emb_dropout=0.1 --set model.attn_dropout=0.1 --set model.resid_dropout=0.1 --set model.mlp_dropout=0.1
+[2026-10-13 19:35:02] finished tune_TR_lr8e-4_d0.0: rc=0, done, val BPC 1.7256
+[2026-10-13 19:38:06] finished tune_TR_lr8e-4_d0.1: rc=0, done, val BPC 1.7832
+[2026-10-13 19:38:06] started tune_TR_lr1.2e-3_d0.0 (grid; 1 running; GPU free 32523 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr1.2e-3_d0.0 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0012 --set model.emb_dropout=0.0 --set model.attn_dropout=0.0 --set model.resid_dropout=0.0 --set model.mlp_dropout=0.0
+[2026-10-13 19:42:12] started tune_TR_lr1.2e-3_d0.1 (grid; 2 running; GPU free 45615 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr1.2e-3_d0.1 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0012 --set model.emb_dropout=0.1 --set model.attn_dropout=0.1 --set model.resid_dropout=0.1 --set model.mlp_dropout=0.1
+[2026-10-13 19:43:55] finished tune_TR_lr1.2e-3_d0.0: rc=0, done, val BPC 1.7019
+[2026-10-13 19:48:21] finished tune_TR_lr1.2e-3_d0.1: rc=0, done, val BPC 1.7557
+[2026-10-13 19:48:21] nothing pending; FAILED (not retried): ['tune_TR_lr6e-4_d0.1']
+[2026-10-13 19:55:17] manual: tune_TR_lr6e-4_d0.1 OOM in evaluation (training finished); re-evaluated with train.py --tuning --eval-only (BPC 1.8041); relaunching
+[2026-10-13 19:55:18] 19 runs finished; GPU 0: {'mem_used': 37653, 'mem_total': 81920, 'free': 44267, 'pids': [3590298, 4112167]}
+Pending now:
+  tune_TR_lr1.8e-3_d0.0 (edge)
+  tune_TR_lr2.7e-3_d0.0 (edge)
+[2026-10-13 19:55:19] started tune_TR_lr1.8e-3_d0.0 (edge; 1 running; GPU free 44369 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr1.8e-3_d0.0 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0018 --set model.emb_dropout=0.0 --set model.attn_dropout=0.0 --set model.resid_dropout=0.0 --set model.mlp_dropout=0.0
+[2026-10-13 19:56:21] started tune_TR_lr2.7e-3_d0.0 (edge; 2 running; GPU free 41395 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr2.7e-3_d0.0 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0027 --set model.emb_dropout=0.0 --set model.attn_dropout=0.0 --set model.resid_dropout=0.0 --set model.mlp_dropout=0.0
+[2026-10-13 20:05:46] finished tune_TR_lr1.8e-3_d0.0: rc=0, done, val BPC 1.6788
+[2026-10-13 20:07:30] finished tune_TR_lr2.7e-3_d0.0: rc=0, done, val BPC 1.6707
+[2026-10-13 20:07:30] started tune_TR_lr1.8e-3_d0.0_ls0 (ls; 1 running; GPU free 44247 MiB): /home/kaiwen/anaconda3/envs/charllm-gpu/bin/python train.py --run-name tune_TR_lr1.8e-3_d0.0_ls0 --config configs/TR2o.yaml --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=0.0018 --set model.emb_dropout=0.0 --set model.attn_dropout=0.0 --set model.resid_dropout=0.0 --set model.mlp_dropout=0.0 --set loss.ls_eps=0.0
+[2026-10-13 20:15:06] finished tune_TR_lr1.8e-3_d0.0_ls0: rc=0, done, val BPC 1.6377
+[2026-10-13 20:15:06] nothing pending
