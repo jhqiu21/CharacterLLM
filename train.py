@@ -19,7 +19,8 @@ Differences from the original notebook (everything else is unchanged):
   * optional weight-decay mask (optimizer.decay_mask) that skips biases, LayerNorm and rel_embed;
   * validation uses one fixed set of 1024 windows of length training.sequence_length (seed 0);
   * the loss is built by make_loss_and_metrics(config) instead of closing over a global config; the training
-    step uses the lean make_train_loss(config) (same loss and gradients, only the logged training metrics);
+    step uses it too (the lean make_train_loss(config) has the same loss and gradients but compiles to a
+    slower TR2o step, results/code_changes_v2.md section 3);
   * the warmup-cosine schedule reaches end_value at the last iteration (the notebook's reached 0 at epochs - warmup);
   * test evaluation in three modes (legacy32, chunked128, full_context), written to eval.json, plus
     single-prompt and multi-prompt Self-BLEU.
@@ -291,8 +292,9 @@ def make_training_loss(config):
 
 
 def make_train_loss(config):
-    """Lean loss for the training step: the optimised loss plus only what Logger.log_train records
-    (loss_train, loss_all, loss_last). Same loss and gradients as make_loss_and_metrics."""
+    """Lean loss: the optimised loss plus only what Logger.log_train records (loss_train, loss_all,
+    loss_last). Same loss and gradients as make_loss_and_metrics. Not used by train(): its jitted step is
+    ~9% slower for TR2o than the one built on make_loss_and_metrics (results/code_changes_v2.md section 3)."""
     training_loss = make_training_loss(config)
 
     @jax.jit
@@ -309,7 +311,7 @@ def make_train_loss(config):
 
 def make_loss_and_metrics(config):
     """Training loss (label smoothing, tail position weights, entropy bonus) plus unweighted metrics
-    (accuracy, perplexity, BPC, entropy, ECE). Used for validation.
+    (accuracy, perplexity, BPC, entropy, ECE). Used for the training step and for validation.
 
     Config values are read once here, so the returned jitted function never depends on a global.
     """
@@ -408,7 +410,7 @@ def make_optimizer(config):
 
 def make_train_step(model, loss_fn_of_logits, tx):
     """Jitted (params, opt_state, x, y, step_key) -> (params, opt_state, metrics). `loss_fn_of_logits`
-    maps (logits, targets) -> (loss, metrics): make_train_loss(config) (train.py) or make_loss_and_metrics."""
+    maps (logits, targets) -> (loss, metrics): make_loss_and_metrics(config) (train.py) or make_train_loss."""
     def train_step(params, opt_state, x, y, step_key):
         def loss_fn(params):
             logits = model.apply({"params": params}, x, deterministic=False, rngs={"dropout": step_key})
@@ -504,10 +506,10 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
     params = init_params(model, config, init_key)
     print(f"Model created: {config.model_name} ({config.model.type}), parameters: {count_params(params):_}")
 
-    loss_and_metrics = make_loss_and_metrics(config)  # validation: full metric set
+    loss_and_metrics = make_loss_and_metrics(config)  # training step and validation: full metric set
     tx = make_optimizer(config)
     opt_state = tx.init(params)
-    train_step = make_train_step(model, make_train_loss(config), tx)  # training: lean loss
+    train_step = make_train_step(model, loss_and_metrics, tx)
     apply_fn = make_apply_fn(model)
 
     val_x, val_y = make_fixed_val_set(val_int, T)

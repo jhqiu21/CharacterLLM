@@ -1,0 +1,23 @@
+........................................................................ [ 33%]
+........................................................................ [ 66%]
+........................................................................ [ 99%]
+.                                                                        [100%]
+=============================== warnings summary ===============================
+tests/test_attention_unified.py::test_equivalent_to_flax_self_attention_without_dropout[learned]
+tests/test_attention_unified.py::test_equivalent_to_flax_self_attention_without_dropout[learned]
+tests/test_attention_unified.py::test_equivalent_to_flax_self_attention_without_dropout[sinusoidal]
+tests/test_attention_unified.py::test_equivalent_to_flax_self_attention_without_dropout[sinusoidal]
+tests/test_attention_unified.py::test_equivalent_to_flax_self_attention_without_dropout[hybrid]
+tests/test_attention_unified.py::test_equivalent_to_flax_self_attention_without_dropout[hybrid]
+tests/test_attention_unified.py::test_new_attention_draws_independent_dropout_masks_per_batch_element
+tests/test_attention_unified.py::test_new_attention_draws_independent_dropout_masks_per_batch_element
+  /home/kaiwen/anaconda3/envs/charllm-gpu/lib/python3.10/site-packages/flax/linen/attention.py:811: DeprecationWarning: SelfAttention will be deprecated soon. Use `MultiHeadDotProductAttention.__call__(inputs_q)` instead. See https://github.com/google/flax/discussions/3389 for more information.
+    warnings.warn(
+
+tests/test_cli.py::test_tuning_never_opens_the_test_file
+  /home/kaiwen/anaconda3/envs/charllm-gpu/lib/python3.10/site-packages/orbax/checkpoint/_src/serialization/jax_array_handlers.py:736: UserWarning: Sharding info not provided when restoring. Populating sharding info from sharding file. Please note restoration time will be slightly increased due to reading from file. Note also that this option is unsafe when restoring on a different topology than the checkpoint was saved with.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+217 passed, 9 warnings in 398.85s (0:06:38)
+pytest exit 0
