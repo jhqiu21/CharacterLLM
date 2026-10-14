@@ -13,7 +13,7 @@ model:
   mlp_dropout: 0.0
   attn_dropout: 0.0
   resid_dropout: 0.0
-  # position encoding type: 'sinusoidal', 'learned', 'hybrid', 'rope', 'alibi', 'relative'
+  # position encoding type: 'sinusoidal', 'learned', 'hybrid', 'rope', 'alibi', 'relative', 'none' (NoPE)
   pos_encoding_type: 'relative'
   # scaling of the fixed sinusoidal table ('sinusoidal' and the sinusoidal half of 'hybrid'):
   # 'unit' = every row has norm 1 (default); 'raw' = unscaled, row norm sqrt(d_model/2) (~11.3 at d_model 256)

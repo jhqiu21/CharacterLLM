@@ -20,6 +20,9 @@ from .positional_encodings import (
     RelativePositionalEncoding
 )
 
+POS_ENCODING_TYPES = ("learned", "sinusoidal", "hybrid", "rope", "alibi", "relative", "none")
+POS_SCALE_TYPES = ("rope", "sinusoidal")  # encodings that support evaluation-time position interpolation
+
 
 class MLP(nn.Module):
         """Transformer feed-forward network (a.k.a. MLP block).
@@ -58,7 +61,8 @@ class MultiHeadAttentionWithPE(nn.Module):
     (including independent attention-dropout masks per batch element and head). It allows:
     - RoPE to be applied to Q and K
     - ALiBi/Relative biases to be added to attention scores
-    For 'learned', 'sinusoidal' and 'hybrid' (applied to the embeddings) it is plain causal attention.
+    For 'learned', 'sinusoidal' and 'hybrid' (applied to the embeddings) and 'none' (NoPE: no positional
+    signal at all, only the causal mask) it is plain causal scaled dot-product attention.
 
     Evaluation-only options (the defaults leave training, outputs and parameters unchanged):
     - capture_attn: sow the post-softmax attention weights (B, H, T, T) into the 'intermediates'
@@ -68,6 +72,7 @@ class MultiHeadAttentionWithPE(nn.Module):
     - rel_clamp: clamp relative offsets to +-(rel_table_len-1) (T5-style), so 'relative' runs on sequences
       longer than rel_table_len. Offsets inside the table are untouched, so for T <= rel_table_len the
       output is identical with or without the clamp.
+    - pos_scale: 'rope' only here; rotation angles use position p * pos_scale (position interpolation).
     """
 
     d_model: int
@@ -78,6 +83,7 @@ class MultiHeadAttentionWithPE(nn.Module):
     capture_attn: bool = False
     rel_table_len: int = 0
     rel_clamp: bool = False
+    pos_scale: float = 1.0
 
     def setup(self):
         self.head_dim = self.d_model // self.n_heads
@@ -98,7 +104,8 @@ class MultiHeadAttentionWithPE(nn.Module):
         elif self.pos_encoding_type == 'rope':
             self.rope = RotaryPositionalEmbedding(
                 head_dim=self.head_dim,
-                max_len=self.max_len
+                max_len=self.max_len,
+                pos_scale=self.pos_scale,
             )
         elif self.pos_encoding_type == 'alibi':
             self.alibi = ALiBiPositionalBias(
@@ -213,6 +220,7 @@ class DecoderBlock(nn.Module):
     capture_attn: bool = False
     rel_table_len: int = 0
     rel_clamp: bool = False
+    pos_scale: float = 1.0
 
     @nn.compact
     def __call__(self, x, *, mask=None, deterministic: bool):
@@ -229,6 +237,7 @@ class DecoderBlock(nn.Module):
             capture_attn=self.capture_attn,
             rel_table_len=self.rel_table_len,
             rel_clamp=self.rel_clamp,
+            pos_scale=self.pos_scale,
         )(h, mask=mask, deterministic=deterministic)
 
         h = nn.Dropout(rate=self.resid_dropout)(h, deterministic=deterministic)
@@ -251,7 +260,8 @@ class DecoderOnlyTransformer(nn.Module):
     Components:
       - Token embeddings: maps token ids to D-dim vectors
       - Position information, depending on pos_encoding_type: added to the embeddings
-        ('learned', 'sinusoidal', 'hybrid') or applied inside attention ('rope', 'alibi', 'relative')
+        ('learned', 'sinusoidal', 'hybrid'), applied inside attention ('rope', 'alibi', 'relative'),
+        or none at all ('none', NoPE: the causal mask is the only source of order information)
       - N stacked decoder blocks with causal self-attention
       - Final LayerNorm
       - Output projection: a separate (untied) linear head `project_to_vocab` to V logits;
@@ -265,6 +275,8 @@ class DecoderOnlyTransformer(nn.Module):
       max_len: Maximum supported sequence length for positional embeddings.
       sinusoidal_scale: 'unit' (rows of the sinusoidal table have norm 1) or 'raw' (norm sqrt(D/2));
         used by 'sinusoidal' and the sinusoidal half of 'hybrid'.
+      pos_scale: evaluation-only position interpolation for 'rope' and 'sinusoidal': position p is replaced
+        by p * pos_scale (e.g. 128 / W maps a window of W onto the trained range). 1.0 = unchanged.
     """
 
     vocab_size: int
@@ -278,14 +290,18 @@ class DecoderOnlyTransformer(nn.Module):
     mlp_dropout: float        # MLP dropout
     attn_dropout: float       # attention weights dropout
     resid_dropout: float      # post-attention/MLP dropout
-    pos_encoding_type: str    # positional encoding type: 'learned', 'sinusoidal', 'hybrid', 'rope', 'alibi', 'relative'
+    pos_encoding_type: str    # 'learned', 'sinusoidal', 'hybrid', 'rope', 'alibi', 'relative', 'none'
     sinusoidal_scale: str = "unit"  # 'unit' or 'raw' (see positional_encodings.sinusoidal_scale_factor)
     # Evaluation-only options, see MultiHeadAttentionWithPE (defaults leave training unchanged).
     capture_attn: bool = False
     rel_table_len: int = 0
     rel_clamp: bool = False
+    pos_scale: float = 1.0
 
     def setup(self):
+        if self.pos_scale != 1.0 and self.pos_encoding_type not in POS_SCALE_TYPES:
+            raise ValueError(f"pos_scale (position interpolation) applies to {POS_SCALE_TYPES} only, "
+                             f"not to pos_encoding_type {self.pos_encoding_type!r}")
         # Token embedding table E with shape (V, D)
         self.tok_embed = nn.Embed(self.vocab_size, self.d_model)
 
@@ -303,6 +319,7 @@ class DecoderOnlyTransformer(nn.Module):
                 d_model=self.d_model,
                 max_len=self.max_len,
                 scale=self.sinusoidal_scale,
+                pos_scale=self.pos_scale,
             )
         elif self.pos_encoding_type == 'hybrid':
             self.pos_encoding = HybridPositionalEncoding(
@@ -310,8 +327,8 @@ class DecoderOnlyTransformer(nn.Module):
                 max_len=self.max_len,
                 scale=self.sinusoidal_scale,
             )
-        elif self.pos_encoding_type in ['rope', 'alibi', 'relative']:
-            # These are handled within attention mechanism
+        elif self.pos_encoding_type in ['rope', 'alibi', 'relative', 'none']:
+            # Handled within the attention mechanism ('none': no positional signal, plain causal attention)
             self.pos_encoding = None
         else:
             raise ValueError(f"Unknown pos_encoding_type: {self.pos_encoding_type}")
@@ -330,6 +347,7 @@ class DecoderOnlyTransformer(nn.Module):
                   capture_attn=self.capture_attn,
                   rel_table_len=self.rel_table_len,
                   rel_clamp=self.rel_clamp,
+                  pos_scale=self.pos_scale,
             ) for _ in range(self.n_layers)
         ]
 

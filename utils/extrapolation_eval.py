@@ -2,11 +2,14 @@
 Length extrapolation: evaluate a model trained on windows of length L (= model.max_len) at context lengths W > L.
 
 The model is rebuilt with max_len = W and the trained parameters are loaded unchanged:
-- 'rope', 'alibi', 'sinusoidal': no parameter depends on max_len, so this works as it is;
+- 'rope', 'alibi', 'sinusoidal', 'none' (NoPE): no parameter depends on max_len, so this works as it is;
 - 'relative': the trained table rel_embed (H, 2L-1) is kept and offsets above L-1 are clamped to L-1
   (T5-style, MultiHeadAttentionWithPE.rel_clamp);
 - 'learned', 'hybrid': a learned table of L rows, so W > L is impossible (ExtrapolationNotSupported, reported as N/A);
 - LSTM: runs on any length (no positional encoding).
+
+Position interpolation (interpolate=True, 'rope' and 'sinusoidal' only, no fine-tuning): positions p are replaced by
+p * L / W (DecoderOnlyTransformer.pos_scale), so a window of W characters maps onto the trained range [0, L).
 
 Two metrics per (run, W):
 1. sliding_window_eval: full_context_eval with window W and stride S (default 128): every target after the first
@@ -22,6 +25,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from models.models import POS_SCALE_TYPES
 from utils.config import Config
 from utils.full_context_eval import full_context_eval
 
@@ -44,13 +48,22 @@ def length_config(config, window):
     return c
 
 
-def rebuild_for_length(config, window, build_model, capture_attn=False):
+def interpolation_scale(config, window):
+    """pos_scale that maps a window of `window` positions onto the training range: L / W (1.0 at W = L)."""
+    return train_len(config) / int(window)
+
+
+def rebuild_for_length(config, window, build_model, capture_attn=False, interpolate=False):
     """Model for windows of length `window` that loads the parameters trained under `config`.
 
     build_model is train.build_model (passed in to keep utils free of a train.py import).
+    interpolate: position interpolation with pos_scale = L / window ('rope' and 'sinusoidal' only).
     """
     L = train_len(config)
     m = config.model
+    if interpolate and (m.type != "transformer" or m.pos_encoding_type not in POS_SCALE_TYPES):
+        raise ValueError(f"position interpolation applies to {POS_SCALE_TYPES} only, not to "
+                         f"{m.type if m.type != 'transformer' else repr(m.pos_encoding_type)}")
     if m.type == "lstm":
         if capture_attn:
             raise ValueError("the LSTM has no attention to capture")
@@ -61,6 +74,8 @@ def rebuild_for_length(config, window, build_model, capture_attn=False):
     opts = {"capture_attn": True} if capture_attn else {}
     if pe == "relative":
         opts.update(rel_table_len=L, rel_clamp=True)
+    if interpolate and window != L:
+        opts["pos_scale"] = interpolation_scale(config, window)
     return build_model(length_config(config, window), **opts)
 
 

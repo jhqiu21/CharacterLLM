@@ -13,6 +13,7 @@ For each layer and head, with distance d = i - j (query i, key j <= i):
 - space mass: weight on the most recent space strictly before the query (word boundary), mean over queries that
   have one, with the uniform-attention value 1/(i+1) as a reference.
 Query-level statistics are also given for queries at positions >= training length (past_train_len) when W is larger.
+--interpolate applies position interpolation (rope / sinusoidal, pos_scale = L / W) and writes to attention_W<W>_pi/.
 Writes runs/<run>/attention_W<W>/stats.json, example.npz (all heads for window 0, float16) and plots
 (distance profiles per layer x head, two example heatmaps).
 """
@@ -145,6 +146,7 @@ def main(argv=None):
     ap.add_argument("--length", type=int, default=128)
     ap.add_argument("--n-windows", type=int, default=512)
     ap.add_argument("--batch-size", type=int, default=0, help="windows per batch (default: 128 * (128/W)^2, at least 4)")
+    ap.add_argument("--interpolate", action="store_true", help="position interpolation, pos_scale = L / W (rope, sinusoidal)")
     ap.add_argument("--data-dir", default=str(ROOT / "data"))
     args = ap.parse_args(argv)
 
@@ -152,7 +154,7 @@ def main(argv=None):
     if config.model.type != "transformer":
         sys.exit("attention analysis needs a Transformer run")
     params, W, L = ckpt["params"], args.length, train_len(config)
-    model = rebuild_for_length(config, W, train.build_model, capture_attn=True)
+    model = rebuild_for_length(config, W, train.build_model, capture_attn=True, interpolate=args.interpolate)
     _, _, test_int = train.load_data(args.data_dir)
     starts = window_starts(len(test_int), W, args.n_windows)
     bs = args.batch_size or max(4, int(128 * (128 / W) ** 2))
@@ -170,13 +172,14 @@ def main(argv=None):
     profile = acc["profile_sum"] / n_valid  # (Lyr,H,W)
 
     res = {"run": args.run, "pos_encoding_type": config.model.pos_encoding_type, "length": W, "train_len": L,
+           "interpolate": bool(args.interpolate), "pos_scale": L / W if args.interpolate else 1.0,
            "n_windows": args.n_windows, "seed": 0, "step": int(ckpt["step"]), "span_mass": SPAN_MASS,
            "git_commit": train.git_commit(), "device": jax.devices()[0].device_kind,
            "n_layers": int(profile.shape[0]), "n_heads": int(profile.shape[1]),
            "distance_profile": profile.tolist(), "all_queries": summarize(acc, args.n_windows, W, 0)}
     if W > L:
         res["past_train_len"] = summarize(acc, args.n_windows, W, L)
-    out_dir = run_dir / f"attention_W{W}"
+    out_dir = run_dir / (f"attention_W{W}_pi" if args.interpolate else f"attention_W{W}")
     out_dir.mkdir(exist_ok=True)
     json.dump(res, open(out_dir / "stats.json", "w"), indent=1)
 
@@ -188,7 +191,7 @@ def main(argv=None):
     np.savez_compressed(out_dir / "example.npz", attn=ex.astype(np.float16), start=starts[0],
                         text="".join(train.INT_TO_CHAR[int(c)] for c in data[starts[0]:starts[0] + W]))
 
-    tag = f"{args.run} ({res['pos_encoding_type']}), W={W}"
+    tag = f"{args.run} ({res['pos_encoding_type']}{' + PI' if args.interpolate else ''}), W={W}"
     plot_profiles(profile, out_dir / "distance_profiles", f"Distance profiles: {tag}")
     span = np.asarray(res["all_queries"]["span_mean"])
     lo, hi = np.unravel_index(span.argmin(), span.shape), np.unravel_index(span.argmax(), span.shape)

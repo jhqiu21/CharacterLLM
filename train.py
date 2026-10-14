@@ -210,7 +210,7 @@ def apply_overrides(d, assignments):
 
 def build_model(config, **eval_options):
     """eval_options: evaluation-only keyword arguments of DecoderOnlyTransformer (capture_attn, rel_table_len,
-    rel_clamp); the defaults build the training model."""
+    rel_clamp, pos_scale); the defaults build the training model."""
     m = config.model
     if eval_options and m.type != "transformer":
         raise ValueError(f"eval_options {sorted(eval_options)} apply to transformers only")

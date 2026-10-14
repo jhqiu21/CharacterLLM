@@ -4,6 +4,7 @@ import train
 from utils.config import Config
 
 PE_TYPES = ["learned", "sinusoidal", "hybrid", "rope", "alibi", "relative"]
+ALL_PE_TYPES = PE_TYPES + ["none"]  # with NoPE (no positional signal), which has no PE table to export
 
 
 def make_config(model_type="transformer", pos_encoding_type="rope", dropout=0.1, max_len=16,

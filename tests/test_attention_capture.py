@@ -3,12 +3,12 @@ import numpy as np
 import pytest
 
 import train
-from helpers import PE_TYPES, make_config, model_and_params
+from helpers import ALL_PE_TYPES, make_config, model_and_params
 
 T = 16
 
 
-@pytest.mark.parametrize("pe", PE_TYPES)
+@pytest.mark.parametrize("pe", ALL_PE_TYPES)
 def test_capture_flag_changes_nothing_and_weights_are_causal_distributions(pe):
     config = make_config(pos_encoding_type=pe, dropout=0.0, max_len=T, n_layers=2, n_heads=2)
     model, params = model_and_params(config)

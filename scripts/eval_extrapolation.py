@@ -6,8 +6,12 @@ Length-extrapolation evaluation of a trained run (utils/extrapolation_eval.py) o
 For each W: sliding-window BPC (window W, stride --stride) and the per-position loss of --n-chunks
 non-overlapping chunks (seed 0). learned / hybrid beyond their training length are recorded as N/A.
 --sanity also scores W = training length with stride 1 and compares it with the run's eval.json full_context BPC.
+--interpolate uses position interpolation (rope / sinusoidal only, no fine-tuning): pos_scale = L / W for each W,
+and writes runs/<run>/extrapolation_pi.json instead (the plain results are never overwritten).
 The evaluation batch size starts at --batch-size and is lowered for large W so the estimate stays below --budget-gib.
 Writes runs/<run>/extrapolation.json (checkpoint best_loss_all_).
+
+    python scripts/eval_extrapolation.py --run TR-final_s42 --lengths 256 512 1024 --interpolate
 """
 
 import argparse
@@ -26,6 +30,7 @@ from utils import load_checkpoint, load_config  # noqa: E402
 from utils.extrapolation_eval import (  # noqa: E402
     ExtrapolationNotSupported,
     auto_batch_size,
+    interpolation_scale,
     per_position_loss,
     rebuild_for_length,
     sliding_window_eval,
@@ -55,10 +60,12 @@ def main(argv=None):
     ap.add_argument("--budget-gib", type=float, default=20.0)
     ap.add_argument("--n-chunks", type=int, default=2048)
     ap.add_argument("--sanity", action="store_true", help="also W = training length, stride 1, vs eval.json")
+    ap.add_argument("--interpolate", action="store_true", help="position interpolation, pos_scale = L / W (rope, sinusoidal)")
     ap.add_argument("--data-dir", default=str(ROOT / "data"))
     args = ap.parse_args(argv)
 
     run_dir, config, ckpt = load_run(args.run)
+    out_file = run_dir / ("extrapolation_pi.json" if args.interpolate else "extrapolation.json")
     params = ckpt["params"]
     train_int, _, test_int = train.load_data(args.data_dir)
     groups = frequency_groups(train_int, config.model.vocab_size, train.INT_TO_CHAR)
@@ -66,7 +73,7 @@ def main(argv=None):
     out = {"run": args.run, "checkpoint": "best_loss_all_", "step": int(ckpt["step"]), "train_len": L,
            "model_type": config.model.type, "pos_encoding_type": getattr(config.model, "pos_encoding_type", None),
            "stride": args.stride, "n_chunks": args.n_chunks, "device": jax.devices()[0].device_kind,
-           "git_commit": train.git_commit(), "lengths": {}}
+           "git_commit": train.git_commit(), "interpolate": bool(args.interpolate), "lengths": {}}
 
     def fc_eval(model, W, stride):
         bs = auto_batch_size(config, W, args.batch_size, args.budget_gib)
@@ -86,21 +93,22 @@ def main(argv=None):
 
     for W in args.lengths:
         try:
-            model = rebuild_for_length(config, W, train.build_model)
+            model = rebuild_for_length(config, W, train.build_model, interpolate=args.interpolate)
         except ExtrapolationNotSupported as e:
             out["lengths"][str(W)] = {"na": str(e)}
             print(f"  W={W}: N/A ({e})", flush=True)
             continue
-        entry = {"sliding": fc_eval(model, W, min(args.stride, W))}
+        entry = {"pos_scale": interpolation_scale(config, W) if args.interpolate else 1.0,
+                 "sliding": fc_eval(model, W, min(args.stride, W))}
         bs = auto_batch_size(config, W, 256, args.budget_gib)
         entry["per_position"] = per_position_loss(model, params, test_int, W, n_chunks=args.n_chunks, seed=0, batch_size=bs)
         print(f"  W={W}: per-position BPC mean {entry['per_position']['bpc_mean']:.4f}, "
               f"buckets {[round(b, 3) for b in entry['per_position']['bpc_buckets']]}", flush=True)
         out["lengths"][str(W)] = entry
-        json.dump(out, open(run_dir / "extrapolation.json", "w"), indent=1)
+        json.dump(out, open(out_file, "w"), indent=1)
     out["peak_device_memory_gib"] = train.peak_memory_gib()
-    json.dump(out, open(run_dir / "extrapolation.json", "w"), indent=1)
-    print(f"Done: {run_dir / 'extrapolation.json'}")
+    json.dump(out, open(out_file, "w"), indent=1)
+    print(f"Done: {out_file}")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import train
-from helpers import PE_TYPES, make_config, model_and_params
+from helpers import ALL_PE_TYPES, make_config, model_and_params
 
 DECAYED = {"kernel", "embedding", "positional_embed", "learned_embed", "W_out"}
 NOT_DECAYED = {"bias", "scale", "rel_embed"}
@@ -16,7 +16,7 @@ def _leaves(params, mask):
     return [(train._path_names(path), leaf, m) for (path, leaf), m in zip(flat_p, flat_m)]
 
 
-@pytest.mark.parametrize("model_type,pe", [("transformer", pe) for pe in PE_TYPES] + [("lstm", None)])
+@pytest.mark.parametrize("model_type,pe", [("transformer", pe) for pe in ALL_PE_TYPES] + [("lstm", None)])
 def test_mask_is_ndim_ge_2_except_rel_embed(model_type, pe):
     config = make_config(model_type, pos_encoding_type=pe or "rope")
     _, params = model_and_params(config)

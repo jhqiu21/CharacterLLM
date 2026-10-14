@@ -11,8 +11,12 @@ import math
 """Sinusoidal positional encodings"""
 
 
-def get_sinusoidal_embeddings(max_len: int, d_model: int) -> jnp.ndarray:
+def get_sinusoidal_embeddings(max_len: int, d_model: int, pos_scale: float = 1.0) -> jnp.ndarray:
+    """(max_len, d_model) table; pos_scale != 1 evaluates it at the fractional positions p * pos_scale
+    (evaluation-only position interpolation, see DecoderOnlyTransformer.pos_scale)."""
     position = jnp.arange(max_len)[:, None]  # (max_len, 1)
+    if pos_scale != 1.0:
+        position = position * pos_scale
     div_term = jnp.exp(jnp.arange(0, d_model, 2) * -(jnp.log(10000.0) / d_model))
 
     pe = jnp.zeros((max_len, d_model))
@@ -41,10 +45,12 @@ class SinusoidalPositionalEncoding(nn.Module):
     d_model: int
     max_len: int
     scale: str = "unit"
+    pos_scale: float = 1.0  # evaluation-only position interpolation; 1.0 = the trained positions
 
     def setup(self):
         # Pre-compute sinusoidal encodings (not learnable)
-        self.pe = get_sinusoidal_embeddings(self.max_len, self.d_model) * sinusoidal_scale_factor(self.scale, self.d_model)
+        self.pe = (get_sinusoidal_embeddings(self.max_len, self.d_model, self.pos_scale)
+                   * sinusoidal_scale_factor(self.scale, self.d_model))
 
     def __call__(self, x):
         # x: Input embeddings of shape (B, T, D)
@@ -55,10 +61,13 @@ class SinusoidalPositionalEncoding(nn.Module):
 """RoPE Positional Encodings"""
 
 
-def precompute_freqs_cis(dim: int, max_len: int, theta: float = 10000.0):
-
+def precompute_freqs_cis(dim: int, max_len: int, theta: float = 10000.0, pos_scale: float = 1.0):
+    """Rotation factors exp(i * p * freq) for positions p = 0..max_len-1; pos_scale != 1 uses p * pos_scale
+    (evaluation-only position interpolation, see DecoderOnlyTransformer.pos_scale)."""
     freqs = 1.0 / (theta ** (jnp.arange(0, dim, 2)[: (dim // 2)] / dim))
     t = jnp.arange(max_len)
+    if pos_scale != 1.0:
+        t = t * pos_scale
     freqs = jnp.outer(t, freqs)  # (max_len, dim//2)
     # Return as complex numbers for rotation
     freqs_cis = jnp.exp(1j * freqs)
@@ -87,9 +96,10 @@ class RotaryPositionalEmbedding(nn.Module):
     head_dim: int
     max_len: int
     theta: float = 10000.0
+    pos_scale: float = 1.0  # evaluation-only position interpolation; 1.0 = the trained positions
 
     def setup(self):
-        self.freqs_cis = precompute_freqs_cis(self.head_dim, self.max_len, self.theta)
+        self.freqs_cis = precompute_freqs_cis(self.head_dim, self.max_len, self.theta, self.pos_scale)
 
     def __call__(self, q, k):
         """Apply RoPE to queries and keys."""

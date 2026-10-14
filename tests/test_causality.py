@@ -2,7 +2,7 @@ import jax
 import numpy as np
 import pytest
 
-from helpers import PE_TYPES, make_config, model_and_params
+from helpers import ALL_PE_TYPES, make_config, model_and_params
 
 T = 16
 
@@ -17,7 +17,7 @@ def _randomize_rel_embed(params):
     return jax.tree_util.tree_map_with_path(f, params)
 
 
-@pytest.mark.parametrize("model_type,pe", [("transformer", pe) for pe in PE_TYPES] + [("lstm", None)])
+@pytest.mark.parametrize("model_type,pe", [("transformer", pe) for pe in ALL_PE_TYPES] + [("lstm", None)])
 @pytest.mark.parametrize("t", [0, 5, T - 2])
 def test_future_tokens_do_not_change_past_logits(model_type, pe, t):
     config = make_config(model_type, pos_encoding_type=pe or "rope", dropout=0.0, max_len=T)

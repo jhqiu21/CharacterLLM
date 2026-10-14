@@ -5,7 +5,7 @@ import pytest
 from flax.linen import attention as attn
 
 import train
-from helpers import PE_TYPES, make_config, model_and_params
+from helpers import ALL_PE_TYPES, make_config, model_and_params
 from models.models import MultiHeadAttentionWithPE
 
 PAPER = dict(d_model=256, n_heads=4, n_layers=4, max_len=128)
@@ -16,7 +16,7 @@ def _path_strings(params):
     return ["/".join(train._path_names(path)) for path, _ in jax.tree_util.tree_flatten_with_path(params)[0]]
 
 
-@pytest.mark.parametrize("pe", PE_TYPES)
+@pytest.mark.parametrize("pe", ALL_PE_TYPES)
 def test_no_flax_self_attention_in_any_parameter_tree(pe):
     _, params = model_and_params(make_config("transformer", pos_encoding_type=pe))
     paths = _path_strings(params)
@@ -26,7 +26,7 @@ def test_no_flax_self_attention_in_any_parameter_tree(pe):
 
 @pytest.mark.parametrize("pe,expected", [
     ("learned", 3_202_048), ("sinusoidal", 3_169_280), ("hybrid", 3_202_048),
-    ("rope", 3_169_280), ("alibi", 3_169_280), ("relative", 3_173_360),
+    ("rope", 3_169_280), ("alibi", 3_169_280), ("relative", 3_173_360), ("none", 3_169_280),
 ])
 def test_parameter_counts_unchanged(pe, expected):
     _, params = model_and_params(make_config("transformer", pos_encoding_type=pe, **PAPER))

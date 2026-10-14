@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 import train
-from helpers import PE_TYPES, make_config, model_and_params
+from helpers import ALL_PE_TYPES, make_config, model_and_params
 from utils.extrapolation_eval import (
     ExtrapolationNotSupported,
     auto_batch_size,
@@ -15,7 +15,7 @@ from utils.extrapolation_eval import (
 from utils.full_context_eval import full_context_eval
 
 L = 16  # training length of the tiny models (stands for 128)
-EXTRAPOLATING = ["rope", "alibi", "sinusoidal", "relative"]
+EXTRAPOLATING = ["rope", "alibi", "sinusoidal", "relative", "none"]
 
 
 def _tokens(n, seed=0):
@@ -28,7 +28,7 @@ def _setup(kind):
     return config, model, params
 
 
-@pytest.mark.parametrize("kind", PE_TYPES + ["lstm"])
+@pytest.mark.parametrize("kind", ALL_PE_TYPES + ["lstm"])
 def test_rebuild_at_training_length_is_identical(kind):
     config, model, params = _setup(kind)
     x = _tokens(L)
