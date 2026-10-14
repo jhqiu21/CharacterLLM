@@ -1,272 +1,111 @@
-# CharacterLLM
+# Positional Encodings and Length Extrapolation in Small Character-Level Transformers
 
+A controlled comparison of a 3.2M-parameter decoder-only Transformer and parameter-matched LSTMs for character-level
+language modelling on text8, in JAX/Flax. Hyperparameters were chosen on validation data only, with decision rules fixed
+in advance; every result is the mean ± std over 3 seeds, evaluated with full-context (sliding-window) scoring.
+The Transformer (RoPE) reaches **1.453 test BPC**, 0.062 better than an LSTM with the same parameter count. Among seven
+positional encodings, RoPE is best at the training length (128 characters), but only **ALiBi extrapolates**: it keeps
+improving up to 1,024 characters (1.413 BPC), while RoPE, sinusoidal and NoPE break down beyond the training length and
+position interpolation without fine-tuning does not rescue them. Attention statistics show why: past the training length,
+RoPE and sinusoidal attention becomes diffuse, while ALiBi's stays local.
 
-A character-level language modeling project implementing Transformer and LSTM baselines for next-character prediction on the text8 dataset. This project explores various architectural choices, positional encodings, and training strategies to achieve publication-quality results.
+## Main results
 
-## Table of Contents
+Test set, best-validation-loss checkpoint, mean ± std over seeds 42–44 ([`results/v4/tables/table_v_tie.md`](results/v4/tables/table_v_tie.md)):
 
-- [Overview](#overview)
-- [Setup](#setup)
-- [Usage](#usage)
-- [Project Layout](#project-layout)
-- [Dataset](#dataset)
-- [Key Training Parameters](#key-training-parameters)
-- [Configuration System](#configuration-system)
-- [Tests](#tests)
-- [Code Style (Check-Style)](#code-style-check-style)
-- [Branches](#branches)
+| Model | Parameters | lr | Test BPC | Accuracy (%) | s / training step |
+|---|---|---|---|---|---|
+| Transformer (RoPE) | 3,169,280 | 1.8e-3 | **1.4532 ± 0.0055** | 68.55 ± 0.11 | 0.0280 |
+| LSTM-3.2M | 3,177,052 | 3.2e-3 | 1.5152 ± 0.0017 | 67.12 ± 0.02 | 0.0664 |
+| LSTM-2.1M | 2,115,072 | 3.2e-3 | 1.5557 ± 0.0040 | 66.26 ± 0.08 | 0.0526 |
 
-## Overview
+The ordering is unchanged at each family's lowest-BPC learning rate (Transformer 1.4412 ± 0.0003, LSTM-3.2M 1.4957 ± 0.0033;
+[`table_v_bestlr.md`](results/v4/tables/table_v_bestlr.md)). Step times are from this JAX implementation on one RTX 3090; the LSTM is
+a `jax.lax.scan` loop, not a fused cuDNN kernel.
 
-This project implements and trains small language models for character-level text generation using the text8 dataset (100M characters from Wikipedia).
+Length extrapolation (all models trained on 128-character windows; sliding-window test BPC, stride 128;
+[`extrapolation.md`](results/v4/tables/extrapolation.md)):
 
-**Key Features:**
-- Decoder-only Transformer and multi-layer LSTM in one code base, selected by `model.type`
-- Multiple positional encoding strategies (Learned, Sinusoidal, RoPE, ALiBi, Hybrid, Relative), all sharing one attention implementation
-- Comprehensive evaluation metrics (BPC, perplexity, accuracy, ECE, rare/common-character accuracy, Self-BLEU)
-- Sliding-window ("full context") evaluation that scores every target character exactly once
-- Advanced loss weighting schemes (linear, sqrt, uniform), label smoothing, entropy bonus
-- N-gram repetition prevention during generation
-- A tuning mode that never touches the test set
-- JAX/Flax implementation for efficient training
+![Test BPC vs evaluation window](results/v4/figures/extrapolation_bpc_vs_W.png)
+
+All findings, with numbers and caveats: [`results/v4/REPORT.md`](results/v4/REPORT.md). Every number of the write-up is traced to
+a file in [`results/v4/claims.md`](results/v4/claims.md). The write-up itself (LaTeX) is maintained in a separate repository.
 
 ## Setup
 
-### Environment
-
-This project uses **Conda** for environment management.
-
-Create the environment using the provided [`environment.yml`](environment.yml) file:
-
 ```bash
-conda env create -f environment.yml
-```
-
-Activate the environment:
-```bash
+conda env create -f environment.yml      # Python 3.10, JAX 0.6.2 (CUDA 12), Flax 0.10.7, Optax 0.2.8
 conda activate charllm-env
+python scripts/prepare_data.py           # downloads text8 (31 MB) -> data/text8_train.txt, data/text8_test.txt (md5-checked)
+pytest                                   # 290 tests, CPU only, about 6 minutes
 ```
 
-Deactivate when done:
-```bash
-conda deactivate
-```
+`data/text8_train.txt` is the first 90M characters of text8 (split 95/5 into training and validation by `train.py`);
+`data/text8_test.txt` is the last 5M. If JAX reports "Unable to load cuSPARSE" and falls back to the CPU, a system CUDA in
+`LD_LIBRARY_PATH` is shadowing the pip CUDA libraries: remove `/usr/local/cuda*` from it.
 
-**Note**: The default environment uses CPU. For GPU training:
-- Replace `cpuonly` with `pytorch-cuda=11.8` in `environment.yml`
-- Change `jax[cpu]` to `jax[cuda12]` or `jax[cuda11]` depending on your CUDA version
+## Reproducing the results
 
-## Usage
+Each command trains or evaluates one run; select the GPU with `CUDA_VISIBLE_DEVICES`. Outputs go to `runs/<run>/` and
+`checkpoints/<run>/`. Times are for one RTX 3090. The launchers in `scripts/` queue all runs of a block
+(`scripts/launch_v3.py`, `scripts/launch_v3_evals.py`, `scripts/launch_v4.py`, each with `--dry-run`).
 
-### Training and evaluation: `train.py`
+| Report item | Command (per seed s ∈ {42, 43, 44}) | Time per run |
+|---|---|---|
+| Transformer vs LSTMs (tie-rule lr) | `python train.py --config configs/final/TR.yaml --seed s --run-name TR-final_s$s --set evaluation.full_context_batch_size=2048` (same for `LSTM.yaml` → `LSTM-final_s$s`, `LR-1.yaml` → `LR-1-final_s$s`) | 33 / 67 / 55 min |
+| Transformer vs LSTMs (lowest-BPC lr) | as above with `--set training.learning_rate=2.7e-3` (Transformer) or `7.2e-3` (LSTMs), run names `..._bestlr` | same |
+| Step times | `python train.py --config configs/final/TR.yaml --seed 42 --tuning --epochs 2000 --run-name timing_TR` (alone on the GPU) | 3 min |
+| Positional encodings | `python train.py --config configs/final/TR.yaml --seed s --run-name TR-final-<pe>_s$s --set model.pos_encoding_type=<pe> --set evaluation.full_context_batch_size=2048`, `<pe>` ∈ learned, sinusoidal, hybrid, alibi, relative, none (run name `nope`) | 31 min |
+| Dropout ablation | `TR.yaml` with `--set model.{emb,attn,resid,mlp}_dropout=0.1`, run names `TR-final-d0.1_s$s` | 33 min |
+| Length extrapolation | `python scripts/eval_extrapolation.py --run <run> --lengths 128 256 512 1024 --sanity` | 4–7 min |
+| Position interpolation | `python scripts/eval_extrapolation.py --run <run> --lengths 128 256 512 1024 --interpolate` (RoPE, sinusoidal runs) | 2 min |
+| Attention analysis | `python scripts/analyze_attention.py --run <run>_s42 --length 128` (and `--length 512`, `--interpolate`) | < 1 min |
+| Positional-encoding tables | `python scripts/export_pe_tables.py --run <run>_s42` | seconds |
+| Hyperparameter search | `python scripts/launch_tuning.py` (rules: [`results/v3_tuning/REPORT.md`](results/v3_tuning/REPORT.md)) | 22 runs, 5–24 min each on an A100 (two at a time) |
+| Learning-rate bracket check | `python train.py --config configs/final/TR.yaml --seed 4212 --tuning --set training.epochs=10000 --set training.learning_rate=<lr>` (and `LSTM.yaml`) | 7 / 12 min |
+| All tables and figures | `python results/v4/aggregate_v4.py --sync` | 1 min |
 
-`train.py` is the canonical entry point. It trains one model from a YAML config, keeps the best checkpoints
-(selected on one fixed validation set of 1024 × `sequence_length` windows), and then evaluates them on the test set.
+`--tuning` never opens the test file: it scores the best-validation checkpoint on the validation split (`val_eval.json`).
+[`results/README.md`](results/README.md) maps every table and figure to the file that produces it.
 
-```bash
-python train.py --config configs/TR2o.yaml --seed 4212
-python train.py --config configs/LR-2.yaml --seed 4212 --run-name LR-2_s4212
-```
-
-GPU selection comes from the environment (`CUDA_VISIBLE_DEVICES=0 python train.py ...`).
-Outputs:
-- `runs/<run_name>/`: `config.yaml` (the resolved config, including overrides), `train.log`, `metrics_history.json`,
-  `training_results.json`, `training_curves.pdf`, `timing.json`, `eval.json`, and a text report with a generated sample;
-- `checkpoints/<run_name>/{best,stage}/`.
-
-The default run name is `<model_name>_s<seed>`. `eval.json` holds test metrics in three modes (`legacy32`,
-`chunked128`, `full_context`), single-prompt Self-BLEU (`self_bleu_4`), and multi-prompt Self-BLEU
-(`self_bleu_4_multi`: Self-BLEU within the samples of each of 10 validation-split prompts, mean ± std over prompts).
-
-### Overriding config values: `--set`
-
-`--set` overrides one dotted config key and can be repeated. Values are parsed as int, float, bool (`true`/`false`) or string.
-An unknown key is an error. Overrides are recorded under `run.overrides` in the run's `config.yaml`.
-
-```bash
-python train.py --config configs/TR2o.yaml --seed 4212 \
-    --set training.learning_rate=6e-4 --set model.attn_dropout=0.1 --set loss.ls_eps=0.0
-```
-
-### Hyperparameter search: `--tuning`
-
-`--tuning` never opens the test file. Checkpoint selection works as in a normal run. At the end, the best-loss checkpoint
-is scored with full-context evaluation on the **validation** split (stride `evaluation.tuning_val_stride`, default 8),
-and the results go to `runs/<run_name>/val_eval.json`. Tuning mode writes no test metrics, no samples and no Self-BLEU.
-
-```bash
-python train.py --config configs/TR2o.yaml --seed 4212 --tuning --set training.learning_rate=6e-4 --run-name TR2o_lr6e-4
-```
-
-### Other flags
-
-- `--legacy-dropout-rng`: reuse one dropout key on every step (reproduces an old bug; ablation only).
-- `--eval-only`: re-run the final evaluation from a finished run's checkpoints.
-- `--data-dir DIR`: directory with `text8_train.txt` / `text8_test.txt` (default `data/`).
-- `--epochs N`, `--val-interval N`, `--fc-stride S`: for smoke tests only, e.g. `--epochs 300 --val-interval 100 --fc-stride 64`.
-
-`scripts/launch_all.py` queues a batch of runs, one per free GPU (`--smoke` for 300-iteration checks, `--dry-run` to print the queue).
-
-### Notebook
-
-`transformer.ipynb` is an interactive version of `train.py`. It imports its building blocks (data loading, model, loss,
-optimizer, training step, evaluation) from `train.py`, so both train the same way.
-
-## Project Layout
+## Project layout
 
 ```
-.
-├── train.py                    # Training + evaluation entry point (--set, --tuning, --eval-only)
-├── transformer.ipynb           # Interactive notebook built on train.py
-│
-├── configs/                    # YAML configuration files
-│   ├── baseline.yaml          # Default transformer configuration
-│   ├── TR2o.yaml, TR8o.yaml   # Transformer runs (RoPE / relative position bias)
-│   ├── LR-1.yaml, LR-2.yaml   # LSTM runs (hidden 256 / 314)
-│   └── TR2o-nomask.yaml       # TR2o with weight decay on every parameter (ablation)
-│
-├── models/                     # Core model implementations
-│   ├── models.py              # Decoder-only Transformer (MultiHeadAttentionWithPE for every PE type)
-│   ├── LSTM.py                # Character-level LSTM (CharLSTM)
-│   └── positional_encodings.py # Positional encoding methods
-│
-├── utils/                      # Training and evaluation utilities
-│   ├── config.py              # Configuration loader
-│   ├── logger.py              # Metrics logging
-│   ├── analysis.py            # Performance analysis
-│   ├── plot.py                # Training curve visualization
-│   ├── eval.py                # Evaluation metrics (BPC, perplexity, ECE, Self-BLEU, ...)
-│   ├── full_context_eval.py   # Sliding-window evaluation (every target scored once)
-│   ├── generation.py          # Text generation (exact prompt conditioning, n-gram blocking)
-│   ├── test.py                # Block-wise test set evaluation (legacy32 / chunked128)
-│   └── checkpoint_saver.py    # Checkpoint management
-│
-├── tests/                      # pytest suite (runs on CPU)
-├── scripts/                    # launch_all.py (run queue), gpu_sampler.py (GPU usage log)
-├── results/                    # Committed result tables and reports
-│
-├── data/
-│   ├── text8_train.txt        # Training data (train/validation split 95/5 in train.py)
-│   └── text8_test.txt         # Test data
-│
-├── checkpoints/                # Model checkpoints (auto-created)
-├── runs/                       # Experiment outputs (auto-created)
-│
-├── .github/workflows/          # CI/CD pipelines
-├── .pre-commit-config.yaml     # Pre-commit hooks configuration
-├── pyproject.toml              # Ruff and pytest configuration
-├── environment.yml             # Conda environment specification
-└── README.md                   # This file
+train.py                  training + evaluation entry point (data, model, loss, optimizer, schedule, evaluation)
+transformer.ipynb         interactive alternative to train.py, built on the same functions
+models/
+  models.py               decoder-only Transformer; one attention module for every positional encoding
+  positional_encodings.py sinusoidal, learned, hybrid, RoPE, ALiBi, relative bias (NoPE = no module)
+  LSTM.py                 multi-layer LSTM (jax.lax.scan)
+utils/                    evaluation (full-context, extrapolation, metrics, Self-BLEU), generation, checkpoints, plots
+scripts/                  data preparation, launchers, extrapolation / attention / PE-table evaluation
+configs/final/            the configurations used for every reported result
+configs/*.yaml            legacy configurations of the original course project (pilot experiments), kept for history
+tests/                    pytest suite (CPU)
+results/                  committed results; v4/ is current (see results/README.md)
 ```
 
-## Dataset
+**Configs.** `configs/final/TR.yaml` (Transformer, RoPE; the other encodings via `--set model.pos_encoding_type=...`),
+`configs/final/LSTM.yaml` (LSTM-3.2M, hidden 314) and `configs/final/LR-1.yaml` (LSTM-2.1M, hidden 256). All three: 4 layers,
+128-character windows, batch 128, 50,000 iterations (`training.epochs` counts iterations), warmup 2,000 then cosine decay,
+AdamW (weight decay 0.1 on matrices only), no dropout, no label smoothing. `--set section.key=value` overrides any key and is
+recorded in the run's `config.yaml`.
 
-The **text8** dataset contains the first 100 million characters from a cleaned English Wikipedia dump. It includes only lowercase letters (a-z) and spaces, making it compact and ideal for benchmarking character-level models.
+**Evaluation-only options.** `scripts/eval_extrapolation.py` rebuilds a trained model for a longer window W: RoPE, ALiBi,
+sinusoidal and NoPE need no change; relative bias clamps offsets beyond the trained table (T5-style); learned and hybrid
+tables cannot be extended. `--interpolate` scales positions by 128/W (position interpolation, RoPE and sinusoidal only).
 
-- **Vocabulary size**: 27 tokens (26 letters + space)
-- **Training set**: ~85.5M characters (first 95% of `text8_train.txt`)
-- **Validation set**: ~4.5M characters (last 5% of `text8_train.txt`)
-- **Test set**: 5M characters (`text8_test.txt`)
+## Tests and code style
 
-## Key Training Parameters
+`pytest` runs on the CPU (`tests/conftest.py`). It covers causality and parameter counts for every encoding, bit-identity of the
+encodings against saved reference logits, dropout RNG, the weight-decay mask, the LR schedule, the training loss, full-context
+and extrapolation evaluation, attention capture and statistics, generation, Self-BLEU and the `--set` / `--tuning` options.
 
-**Transformer (`model.type: transformer`):**
-
-| Parameter | Description | Default (`baseline.yaml`) |
-|-----------|-------------|---------|
-| `max_len` | Sequence length (context window) | 128 |
-| `d_model` | Hidden dimension | 256 |
-| `n_layers` | Number of transformer layers | 4 |
-| `n_heads` | Number of attention heads | 4 |
-| `pos_encoding_type` | `learned`, `sinusoidal`, `hybrid`, `rope`, `alibi` or `relative` | `learned` |
-| `sinusoidal_scale` | `unit` (sinusoidal rows have norm 1) or `raw` (unscaled, norm √(d_model/2)) | `unit` |
-| `emb/attn/mlp/resid_dropout` | Dropout rates | 0.1 |
-
-**LSTM (`model.type: lstm`):**
-
-| Parameter | Description | Default (`LR-1.yaml`) |
-|-----------|-------------|---------|
-| `hidden_size` | LSTM hidden dimension | 256 |
-| `n_layers` | Number of stacked LSTM layers | 4 |
-| `dropout` | Variational dropout rate | 0.1 |
-| `forget_bias` | Initial forget-gate bias (0.0 = all-zero bias) | 1.0 |
-| `max_len` | Sequence length | 128 |
-
-**Shared:**
-
-| Parameter | Description | Default (`baseline.yaml`) |
-|-----------|-------------|---------|
-| `training.learning_rate` | Peak learning rate | 0.0003 |
-| `training.batch_size` | Training batch size | 128 |
-| `training.epochs` | Total training **iterations** (random batches) | 5000 |
-| `scheduler.warmup_iters` | Linear warmup, then cosine decay to `end_value` at the last iteration | 2000 |
-| `loss.ls_eps` | Label smoothing (0 = off) | 0.05 |
-
-## Configuration System
-
-The project uses YAML configuration files for reproducible experiments. All hyperparameters are centralized in config files,
-with these sections: `model`, `loss`, `scheduler`, `optimizer` (AdamW settings and the weight-decay mask), `training`,
-`evaluation` (sampling, Self-BLEU, full-context and tuning settings) and `output`. Keys missing from older configs get
-defaults from `train.resolve_config`. Any key can be overridden from the command line with `--set`.
-
-## Tests
-
-The test suite runs on CPU (`tests/conftest.py` sets `JAX_PLATFORMS=cpu`) and takes a few minutes:
-
-```bash
-pytest            # whole suite
-pytest tests/test_generation.py -q
-```
-
-It covers causality, dropout RNG, the weight-decay mask, parameter counts, full-context evaluation, the learning-rate
-schedule, the training loss, generation, Self-BLEU prompts, and the `--set` / `--tuning` command-line options.
-
-## Code Style (Check-Style)
-
-We enforce consistent Python/Notebook style with **Ruff + nbQA + pre-commit**.
-
-- 📄 Full guide: See **[docs/check-style.md](docs/check-style.md)** for details
-- 🔁 CI runs style checks automatically on every **Push/Pull Request**
-- ✅ **Strongly recommended**: Run local checks before pushing
-
-```bash
-ruff check .
-nbqa ruff .
-pre-commit run --all-files
-```
-
-If violations are found in CI, **the PR cannot be merged** until all issues are fixed.
-
-## Branches
-
-This repository contains three main branches for different experimental approaches:
-
-### [`main`](https://github.com/jhqiu21/CharacterLLM/tree/main) - Transformer Baseline
-The main branch implements a decoder-only transformer with:
-- Multiple positional encoding options (RoPE, ALiBi, Learned, etc.)
-- Character-level tokenization (27 tokens)
-- Comprehensive evaluation metrics
-
-The LSTM model (`models/LSTM.py`) and `train.py` live alongside the Transformer on the development branches built on `main`.
-
-### [`LSTM-baseline`](https://github.com/jhqiu21/CharacterLLM/tree/LSTM-baseline) - LSTM Baseline
-Alternative architecture using LSTM for comparison:
-- Character-level LSTM model
-- Useful for comparing transformer vs recurrent approaches
-- May achieve competitive results with simpler architecture
-
-### [`subword-tokenization-baseline`](https://github.com/jhqiu21/CharacterLLM/tree/LSTM-baseline) - Subword Tokenization
-Transformer with subword tokenization:
-- BPE/WordPiece tokenization instead of character-level
-- Larger vocabulary, shorter sequences
-- Different trade-offs in modeling granularity
-
+Style: Ruff (line length 140, rules E/W/F) on Python files and, via nbQA, on the notebook. CI runs
+`pre-commit run --all-files`; run `ruff check .`, `nbqa ruff .` and `pre-commit run --all-files` locally before committing.
 
 ## Acknowledgments
 
-- Text8 dataset from Matt Mahoney's compression benchmark
-- The naive model baseline from alexxthiery's [char_transformer repository](https://github.com/alexxthiery/char_transformer)
-
----
-
-**Questions or Issues?** Open an issue on GitHub or check the documentation in `docs/`.
+Authors: Qiu Jinhang, Tian Junjie, Yu Hanyue, Liu Yuxin. text8 is from Matt Mahoney's
+[compression benchmark](http://mattmahoney.net/dc/textdata.html). The original baseline notebook came from
+[alexxthiery/char_transformer](https://github.com/alexxthiery/char_transformer).

@@ -25,7 +25,7 @@ Both optima are bracketed; no 50k run was added (`tables/lr_bracket.md`).
 - Part 0: NoPE (`pos_encoding_type: none`) and `pos_scale` / `--interpolate`, with tests.
 - Part 1: 3 NoPE runs, 6 bracket runs, all evaluations (21 jobs, none failed).
 - Part 2: `raw/`, `aggregate_v4.py`, `tables/`, `figures/`, `REPORT.md`, `claims.md` + `check_claims.py`.
-- Part 3 (README rewrite pending): `results/README.md`, code clean-up, `environment.yml` (verified: fresh env, 290 passed),
+- Part 3: README rewrite, `results/README.md`, code clean-up, `environment.yml` (verified: fresh env, 290 passed),
   `scripts/prepare_data.py` (verified md5s), dataset untracked, notebook re-checked, local `CLAUDE.md` updated.
 
 ## Not done / open questions for the user

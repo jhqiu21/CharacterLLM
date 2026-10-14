@@ -22,7 +22,7 @@ For additional safety, enable branch protection to require the **CheckStyle** jo
 
 
 ## Quick start (local)
-1. Set up your working environment. You may refer [here](../README.md/#environment)
+1. Set up your working environment. You may refer [here](../README.md#setup)
 
 1. activate the environment:
     ```bash
