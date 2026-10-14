@@ -176,7 +176,7 @@ $RECYCLE.BIN/
 # ==========================================
 # Data / output / experiment artifacts
 # ==========================================
-data/
+/data/
 datasets/
 outputs/
 logs/
@@ -213,3 +213,4 @@ vscode-local-history/
 .DS_Store
 .nano/
 !results/v3/figures/*.png
+!results/v4/figures/*.png
