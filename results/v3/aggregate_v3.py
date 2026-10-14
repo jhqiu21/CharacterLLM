@@ -359,7 +359,7 @@ def style(ax):
 
 def save(fig, stem):
     FIGS.mkdir(parents=True, exist_ok=True)
-    fig.savefig(FIGS / f"{stem}.pdf", bbox_inches="tight")
+    fig.savefig(FIGS / f"{stem}.pdf", bbox_inches="tight", metadata={"CreationDate": None})  # reproducible bytes
     fig.savefig(FIGS / f"{stem}.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
@@ -415,7 +415,6 @@ def fig_per_position():
             ax.plot(x, m, color=COLORS[label], lw=1.6, ls=ls, label=f"{label} ({len(c)} seeds)")
         if W > 128:
             ax.axvline(128, color=MUTED, lw=0.8, ls=":")
-            ax.set_yscale("log")
         ax.set_xlabel("position in the window", color=INK, fontsize=9)
         ax.set_ylabel("mean test BPC at position", color=INK, fontsize=9)
         ax.set_title(f"Per-position loss, W={W}, 2,048 test chunks" + (f" (running mean over {smooth})" if smooth > 1 else ""),
@@ -524,7 +523,8 @@ def fig_pe_similarity_and_pca():
         im = ax.imshow(cos_sim(t["table"]), cmap="RdBu_r", vmin=-1, vmax=1, interpolation="nearest")
         ax.set_title(f"{pe}" + (" (table added)" if pe == "hybrid" else ""), fontsize=9, color=INK)
         ax.set_xlabel("position", fontsize=8)
-        ax.set_ylabel("position", fontsize=8)
+        if ax is axes[0][0]:
+            ax.set_ylabel("position", fontsize=8)
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.8, label="cosine similarity")
     fig.suptitle("Position-embedding similarity (seed 42)", fontsize=10, color=INK)
     save(fig, "pe_similarity")

@@ -1,0 +1,13 @@
+{
+  "s_per_step_median": 0.025469094514846802,
+  "tokens_per_s": 643289.4577563097,
+  "timing_iterations": "iterations [1000, 2000) excluding validation iterations",
+  "n_timed_steps": 998,
+  "s_per_step_mean_all_iterations_incl_validation": 0.02659143766403198,
+  "total_train_time_s": 1329.5718832015991,
+  "batch_size": 128,
+  "sequence_length": 128,
+  "device": "NVIDIA GeForce RTX 3090",
+  "cuda_visible_devices": "2",
+  "peak_device_memory_gib_training": 1.77
+}

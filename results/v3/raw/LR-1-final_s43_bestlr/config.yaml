@@ -1,0 +1,60 @@
+model_name: LR-1-final
+model:
+  type: lstm
+  vocab_size: 27
+  hidden_size: 256
+  n_layers: 4
+  max_len: 128
+  dropout: 0.0
+  forget_bias: 1.0
+loss:
+  LABEL_SMOOTHING: true
+  ls_eps: 0.0
+  entropy_lambda: 0.0
+  tail_scheme: linear
+scheduler:
+  warmup_iters: 2000
+  init_value: 0.0
+  end_value: 0.0
+optimizer:
+  b1: 0.9
+  b2: 0.95
+  eps: 1.0e-08
+  weight_decay: 0.1
+  grad_clip_norm: 1.0
+  decay_mask: true
+training:
+  batch_size: 128
+  sequence_length: 128
+  learning_rate: 0.0072
+  epochs: 50000
+  validation_interval: 500
+  stage_checkpoint_interval: 10000
+  seed: 43
+evaluation:
+  sample: true
+  seed: 4212
+  prompt: hello my fri
+  gen_len: 1000
+  temperature: 0.7
+  self_belu_n_grams: 4
+  self_belu_n_samples: 20
+  full_context_stride: 1
+  full_context_batch_size: 2048
+  self_bleu_multi_n_prompts: 10
+  self_bleu_multi_n_samples: 20
+  self_bleu_multi_prompt_len: 128
+  tuning_val_stride: 8
+output:
+  checkpoint_dir: ./checkpoints
+  results_dir: ./runs
+run:
+  run_name: LR-1-final_s43_bestlr
+  seed: 43
+  legacy_dropout_rng: false
+  tuning: false
+  config_file: configs/final/LR-1.yaml
+  overrides:
+    training.learning_rate: 0.0072
+    evaluation.full_context_batch_size: 2048
+  git_commit: 37393cd8c6788a393c9317f4f214b00f9e9fb568

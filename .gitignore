@@ -212,3 +212,4 @@ vscode-local-history/
 .local-history/
 .DS_Store
 .nano/
+!results/v3/figures/*.png

@@ -1,0 +1,390 @@
+{
+  "run_name": "LSTM-final_s42",
+  "model_name": "LSTM-final",
+  "model_type": "lstm",
+  "pos_encoding_type": null,
+  "seed": 42,
+  "legacy_dropout_rng": false,
+  "decay_mask": true,
+  "num_params": 3177052,
+  "config_file": "configs/final/LSTM.yaml",
+  "overrides": {
+    "evaluation.full_context_batch_size": 2048
+  },
+  "git_commit": "d3337bf0e9726b798be78540cd9c00e69507772e",
+  "eval_git_commit": "d3337bf0e9726b798be78540cd9c00e69507772e",
+  "device": "NVIDIA GeForce RTX 3090",
+  "frequency_groups": {
+    "rare_ids": [
+      16,
+      9,
+      23,
+      25,
+      10
+    ],
+    "common_ids": [
+      13,
+      0,
+      19,
+      4,
+      26
+    ],
+    "rare": [
+      {
+        "id": 16,
+        "char": "q",
+        "train_freq": 0.0008651461988304094
+      },
+      {
+        "id": 9,
+        "char": "j",
+        "train_freq": 0.0016696608187134502
+      },
+      {
+        "id": 23,
+        "char": "x",
+        "train_freq": 0.002931719298245614
+      },
+      {
+        "id": 25,
+        "char": "z",
+        "train_freq": 0.0036927251461988304
+      },
+      {
+        "id": 10,
+        "char": "k",
+        "train_freq": 0.004894339181286549
+      }
+    ],
+    "common": [
+      {
+        "id": 13,
+        "char": "n",
+        "train_freq": 0.06582063157894737
+      },
+      {
+        "id": 0,
+        "char": "a",
+        "train_freq": 0.06608659649122807
+      },
+      {
+        "id": 19,
+        "char": "t",
+        "train_freq": 0.06954843274853802
+      },
+      {
+        "id": 4,
+        "char": "e",
+        "train_freq": 0.10664908771929825
+      },
+      {
+        "id": 26,
+        "char": " ",
+        "train_freq": 0.1699996842105263
+      }
+    ],
+    "top_percent": 0.2,
+    "n_per_group": 5
+  },
+  "throughput": {
+    "s_per_step_median": 0.06850497797131538,
+    "tokens_per_s": 239165.10135745697,
+    "timing_iterations": "iterations [1000, 2000) excluding validation iterations",
+    "n_timed_steps": 998,
+    "s_per_step_mean_all_iterations_incl_validation": 0.06903574223518372,
+    "total_train_time_s": 3451.787111759186,
+    "batch_size": 128,
+    "sequence_length": 128,
+    "device": "NVIDIA GeForce RTX 3090",
+    "cuda_visible_devices": "2",
+    "peak_device_memory_gib_training": 1.31
+  },
+  "checkpoints": {
+    "best_loss_all_": {
+      "step": 49999,
+      "val_loss": 1.125370979309082,
+      "val_bpc": 1.6235671043395996,
+      "val_perplexity": 3.08135986328125,
+      "val_acc": 0.6493682861328125,
+      "val_acc_last": 0.6552734375,
+      "ECE": 0.0028296071104705334,
+      "legacy32": {
+        "perplexity": 3.392929546629147,
+        "bpc": 1.7625315189361572,
+        "acc": 0.6160962958084909,
+        "acc_last": 0.6616532175164473,
+        "acc_rare": 0.40585294365882874,
+        "acc_common": 0.7330194115638733,
+        "distinct": 0.01608445918138482,
+        "coherence": 0.867550592450864,
+        "sequence_length": 32,
+        "rare_common_definition": "per-batch target frequency (utils.eval.token_frequency_analysis)",
+        "seconds": 57.41422152519226
+      },
+      "chunked128": {
+        "perplexity": 3.0003544331880376,
+        "bpc": 1.5851329565048218,
+        "acc": 0.6555476941560444,
+        "acc_last": 0.6705129523026315,
+        "acc_rare": 0.44655653834342957,
+        "acc_common": 0.7664045691490173,
+        "distinct": 0.004704762225676524,
+        "coherence": 0.8775537259242476,
+        "sequence_length": 128,
+        "rare_common_definition": "per-batch target frequency (utils.eval.token_frequency_analysis)",
+        "seconds": 19.591212034225464
+      },
+      "full_context": {
+        "bpc": 1.5170287089872954,
+        "loss": 1.0515241724630375,
+        "perplexity": 2.8620099922004067,
+        "acc": 0.6709813341962668,
+        "ece": 0.005682230399657867,
+        "acc_rare": 0.4658545588778147,
+        "acc_common": 0.791220716714622,
+        "n_scored": 4999999,
+        "n_targets_expected": 4999999,
+        "window": 128,
+        "stride": 1,
+        "min_context_after_first_window": 128,
+        "n_windows": 4999872,
+        "batch_size": 2048,
+        "seconds": 211.78234767913818,
+        "ece_bins": {
+          "n_bins": 20,
+          "count": [
+            0,
+            32404,
+            214329,
+            235830,
+            232613,
+            211468,
+            217713,
+            210985,
+            193438,
+            185635,
+            187514,
+            163283,
+            149870,
+            143934,
+            145473,
+            154392,
+            175338,
+            217576,
+            319028,
+            1609176
+          ],
+          "conf_sum": [
+            0.0,
+            3010.884840257466,
+            26927.024031877518,
+            41344.15827989578,
+            52188.3427901268,
+            58166.182191848755,
+            70769.1659193039,
+            79055.00837612152,
+            82151.53631925583,
+            88192.89665985107,
+            98332.01313972473,
+            93809.40636253357,
+            93630.5610666275,
+            97145.33559417725,
+            105485.746966362,
+            119710.55195379257,
+            144765.75485134125,
+            190633.3662891388,
+            295753.8042449951,
+            1592978.62991333
+          ],
+          "correct_sum": [
+            0,
+            2909,
+            26125,
+            40114,
+            51760,
+            57357,
+            70363,
+            79408,
+            83021,
+            89588,
+            99926,
+            95345,
+            95921,
+            99512,
+            107562,
+            121913,
+            147004,
+            192958,
+            298150,
+            1595970
+          ]
+        },
+        "class_count": [
+          329491,
+          59000,
+          135538,
+          140569,
+          533799,
+          95381,
+          80068,
+          181203,
+          323963,
+          8365,
+          23717,
+          160907,
+          121837,
+          327631,
+          327682,
+          80978,
+          4306,
+          278184,
+          269216,
+          343222,
+          107164,
+          50544,
+          65741,
+          15533,
+          59506,
+          21222,
+          855232
+        ],
+        "class_correct": [
+          189105,
+          18630,
+          65468,
+          92147,
+          411845,
+          41460,
+          51350,
+          130210,
+          182752,
+          749,
+          11299,
+          93747,
+          45765,
+          253719,
+          204259,
+          28125,
+          680,
+          185762,
+          150579,
+          237774,
+          50692,
+          27499,
+          21560,
+          10054,
+          40304,
+          11292,
+          798080
+        ]
+      },
+      "self_bleu_4": 0.1470796966236446,
+      "self_bleu_4_multi": {
+        "mean": 0.14003977272378626,
+        "std": 0.022631843186568423,
+        "per_prompt": [
+          0.16724907048130766,
+          0.1274311453984258,
+          0.16662055728072256,
+          0.12241610328525965,
+          0.16467439708495057,
+          0.1003090569684886,
+          0.1513798364826569,
+          0.13042213855671053,
+          0.145787432281383,
+          0.12410798941795728
+        ],
+        "n_prompts": 10,
+        "n_samples": 20,
+        "prompt_source": "validation split",
+        "prompt_len": 128,
+        "prompt_offsets": [
+          74372,
+          184375,
+          338570,
+          788680,
+          1214004,
+          1385191,
+          2300045,
+          2866241,
+          3659612,
+          3827693
+        ],
+        "prompt_offset_seed": 0,
+        "std_ddof": 1
+      },
+      "sample_file": "bestlossall.txt"
+    },
+    "best_acc_total_": {
+      "step": 47500,
+      "val_loss": 1.1258933544158936,
+      "val_bpc": 1.6243207454681396,
+      "val_perplexity": 3.082969903945923,
+      "val_acc": 0.6495819091796875,
+      "val_acc_last": 0.6572265625,
+      "ECE": 0.0036053042858839035,
+      "legacy32": {
+        "perplexity": 3.394357195729863,
+        "bpc": 1.7631384134292603,
+        "acc": 0.6159055609452097,
+        "acc_last": 0.6616917660361842,
+        "acc_rare": 0.4086449444293976,
+        "acc_common": 0.7332759499549866,
+        "distinct": 0.016128028350833216,
+        "coherence": 0.8675728635744766,
+        "sequence_length": 32,
+        "rare_common_definition": "per-batch target frequency (utils.eval.token_frequency_analysis)",
+        "seconds": 53.2488055229187
+      },
+      "chunked128": {
+        "perplexity": 3.001709235720718,
+        "bpc": 1.5857841968536377,
+        "acc": 0.6553718165347451,
+        "acc_last": 0.670178865131579,
+        "acc_rare": 0.44955936074256897,
+        "acc_common": 0.7666621208190918,
+        "distinct": 0.004717611916069137,
+        "coherence": 0.8774100358839884,
+        "sequence_length": 128,
+        "rare_common_definition": "per-batch target frequency (utils.eval.token_frequency_analysis)",
+        "seconds": 17.154357433319092
+      }
+    },
+    "best_acc_last_": {
+      "step": 45000,
+      "val_loss": 1.1279888153076172,
+      "val_bpc": 1.6273438930511475,
+      "val_perplexity": 3.0894367694854736,
+      "val_acc": 0.6480331420898438,
+      "val_acc_last": 0.6591796875,
+      "ECE": 0.0033439050894230604,
+      "legacy32": {
+        "perplexity": 3.4004794717098443,
+        "bpc": 1.7657381296157837,
+        "acc": 0.6152946070620888,
+        "acc_last": 0.660888671875,
+        "acc_rare": 0.4036422669887543,
+        "acc_common": 0.7318968176841736,
+        "distinct": 0.01612842987953244,
+        "coherence": 0.868138032627751,
+        "sequence_length": 32,
+        "rare_common_definition": "per-batch target frequency (utils.eval.token_frequency_analysis)",
+        "seconds": 53.45787072181702
+      },
+      "chunked128": {
+        "perplexity": 3.008007625482405,
+        "bpc": 1.5888081789016724,
+        "acc": 0.654711873907792,
+        "acc_last": 0.6702816611842105,
+        "acc_rare": 0.4451310932636261,
+        "acc_common": 0.7657841444015503,
+        "distinct": 0.004707573067494913,
+        "coherence": 0.8780529916487932,
+        "sequence_length": 128,
+        "rare_common_definition": "per-batch target frequency (utils.eval.token_frequency_analysis)",
+        "seconds": 17.43825054168701
+      }
+    }
+  },
+  "peak_device_memory_gib": 1.31
+}

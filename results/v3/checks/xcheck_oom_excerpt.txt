@@ -1,0 +1,3 @@
+iteration 9999  time: 308.9 seconds
+E1013 21:27:59.245711  641109 pjrt_stream_executor_client.cc:2916] Execution of replica 0 failed: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 10745850976 bytes. [tf-allocator-allocation-error='']
+jaxlib._jax.XlaRuntimeError: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 10745850976 bytes.

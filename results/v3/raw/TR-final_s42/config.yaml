@@ -1,0 +1,65 @@
+model_name: TR-final
+model:
+  type: transformer
+  vocab_size: 27
+  d_model: 256
+  n_heads: 4
+  n_layers: 4
+  max_len: 128
+  mlp_ratio: 4
+  emb_dropout: 0.0
+  mlp_dropout: 0.0
+  attn_dropout: 0.0
+  resid_dropout: 0.0
+  pos_encoding_type: rope
+  sinusoidal_scale: unit
+loss:
+  LABEL_SMOOTHING: true
+  ls_eps: 0.0
+  entropy_lambda: 0.0
+  tail_scheme: linear
+scheduler:
+  warmup_iters: 2000
+  init_value: 0.0
+  end_value: 0.0
+optimizer:
+  b1: 0.9
+  b2: 0.95
+  eps: 1.0e-08
+  weight_decay: 0.1
+  grad_clip_norm: 1.0
+  decay_mask: true
+training:
+  batch_size: 128
+  sequence_length: 128
+  learning_rate: 0.0018
+  epochs: 50000
+  validation_interval: 500
+  stage_checkpoint_interval: 10000
+  seed: 42
+evaluation:
+  sample: true
+  seed: 4212
+  prompt: hello my fri
+  gen_len: 1000
+  temperature: 0.7
+  self_belu_n_grams: 4
+  self_belu_n_samples: 20
+  full_context_stride: 1
+  full_context_batch_size: 2048
+  self_bleu_multi_n_prompts: 10
+  self_bleu_multi_n_samples: 20
+  self_bleu_multi_prompt_len: 128
+  tuning_val_stride: 8
+output:
+  checkpoint_dir: ./checkpoints
+  results_dir: ./runs
+run:
+  run_name: TR-final_s42
+  seed: 42
+  legacy_dropout_rng: false
+  tuning: false
+  config_file: configs/final/TR.yaml
+  overrides:
+    evaluation.full_context_batch_size: 2048
+  git_commit: d3337bf0e9726b798be78540cd9c00e69507772e

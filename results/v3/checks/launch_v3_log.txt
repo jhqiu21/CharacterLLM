@@ -1,0 +1,75 @@
+[2026-10-13 23:33:33] GPUs [2, 3]; skipped (finished or reused): ['TR-final_s42', 'LSTM-final_s42', 'LR-1-final_s42']
+Queue:
+[2026-10-13 23:33:33] started timing_TR on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name timing_TR --seed 42 --tuning --epochs 2000 --set evaluation.full_context_batch_size=2048
+[2026-10-13 23:33:33] started timing_LSTM on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name timing_LSTM --seed 42 --tuning --epochs 2000 --set evaluation.full_context_batch_size=2048
+[2026-10-13 23:35:57] finished timing_TR on GPU 2: rc=0, complete=True, 2.4 min
+[2026-10-13 23:35:57] started timing_LR-1 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LR-1.yaml --run-name timing_LR-1 --seed 42 --tuning --epochs 2000 --set evaluation.full_context_batch_size=2048
+[2026-10-13 23:36:38] finished timing_LSTM on GPU 3: rc=0, complete=True, 3.1 min
+[2026-10-13 23:36:38] started TR-final_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final_s43 --seed 43 --set evaluation.full_context_batch_size=2048
+[2026-10-13 23:38:41] finished timing_LR-1 on GPU 2: rc=0, complete=True, 2.7 min
+[2026-10-13 23:38:41] started LSTM-final_s43 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name LSTM-final_s43 --seed 43 --set evaluation.full_context_batch_size=2048
+[2026-10-14 00:16:35] finished TR-final_s43 on GPU 3: rc=0, complete=True, 39.9 min
+[2026-10-14 00:16:35] started LR-1-final_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LR-1.yaml --run-name LR-1-final_s43 --seed 43 --set evaluation.full_context_batch_size=2048
+[2026-10-14 00:47:17] finished LSTM-final_s43 on GPU 2: rc=0, complete=True, 68.6 min
+[2026-10-14 00:47:17] started TR-final_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final_s44 --seed 44 --set evaluation.full_context_batch_size=2048
+[2026-10-14 01:11:50] finished LR-1-final_s43 on GPU 3: rc=0, complete=True, 55.3 min
+[2026-10-14 01:11:50] started LSTM-final_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name LSTM-final_s44 --seed 44 --set evaluation.full_context_batch_size=2048
+[2026-10-14 01:20:02] finished TR-final_s44 on GPU 2: rc=0, complete=True, 32.8 min
+[2026-10-14 01:20:02] started LR-1-final_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LR-1.yaml --run-name LR-1-final_s44 --seed 44 --set evaluation.full_context_batch_size=2048
+[2026-10-14 02:14:58] finished LR-1-final_s44 on GPU 2: rc=0, complete=True, 54.9 min
+[2026-10-14 02:14:58] started TR-final_s42_bestlr on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final_s42_bestlr --seed 42 --set training.learning_rate=2.7e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 02:18:43] finished LSTM-final_s44 on GPU 3: rc=0, complete=True, 66.9 min
+[2026-10-14 02:18:43] started LSTM-final_s42_bestlr on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name LSTM-final_s42_bestlr --seed 42 --set training.learning_rate=7.2e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 02:48:04] finished TR-final_s42_bestlr on GPU 2: rc=0, complete=True, 33.1 min
+[2026-10-14 02:48:04] started LR-1-final_s42_bestlr on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LR-1.yaml --run-name LR-1-final_s42_bestlr --seed 42 --set training.learning_rate=7.2e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 03:25:35] finished LSTM-final_s42_bestlr on GPU 3: rc=0, complete=True, 66.9 min
+[2026-10-14 03:25:35] started TR-final_s43_bestlr on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final_s43_bestlr --seed 43 --set training.learning_rate=2.7e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 03:42:18] finished LR-1-final_s42_bestlr on GPU 2: rc=0, complete=True, 54.2 min
+[2026-10-14 03:42:19] started LSTM-final_s43_bestlr on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name LSTM-final_s43_bestlr --seed 43 --set training.learning_rate=7.2e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 03:58:21] finished TR-final_s43_bestlr on GPU 3: rc=0, complete=True, 32.8 min
+[2026-10-14 03:58:21] started LR-1-final_s43_bestlr on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LR-1.yaml --run-name LR-1-final_s43_bestlr --seed 43 --set training.learning_rate=7.2e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 04:49:10] finished LSTM-final_s43_bestlr on GPU 2: rc=0, complete=True, 66.9 min
+[2026-10-14 04:49:10] started TR-final_s44_bestlr on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final_s44_bestlr --seed 44 --set training.learning_rate=2.7e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 04:52:55] finished LR-1-final_s43_bestlr on GPU 3: rc=0, complete=True, 54.6 min
+[2026-10-14 04:52:56] started LSTM-final_s44_bestlr on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name LSTM-final_s44_bestlr --seed 44 --set training.learning_rate=7.2e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 05:21:56] finished TR-final_s44_bestlr on GPU 2: rc=0, complete=True, 32.8 min
+[2026-10-14 05:21:56] started LR-1-final_s44_bestlr on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LR-1.yaml --run-name LR-1-final_s44_bestlr --seed 44 --set training.learning_rate=7.2e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 05:59:49] finished LSTM-final_s44_bestlr on GPU 3: rc=0, complete=True, 66.9 min
+[2026-10-14 05:59:49] started TR-final-learned_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-learned_s42 --seed 42 --set model.pos_encoding_type=learned --set evaluation.full_context_batch_size=2048
+[2026-10-14 06:16:11] finished LR-1-final_s44_bestlr on GPU 2: rc=0, complete=True, 54.2 min
+[2026-10-14 06:16:11] started TR-final-sinusoidal_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-sinusoidal_s42 --seed 42 --set model.pos_encoding_type=sinusoidal --set evaluation.full_context_batch_size=2048
+[2026-10-14 06:31:12] finished TR-final-learned_s42 on GPU 3: rc=0, complete=True, 31.4 min
+[2026-10-14 06:31:12] started TR-final-hybrid_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-hybrid_s42 --seed 42 --set model.pos_encoding_type=hybrid --set evaluation.full_context_batch_size=2048
+[2026-10-14 06:46:34] finished TR-final-sinusoidal_s42 on GPU 2: rc=0, complete=True, 30.4 min
+[2026-10-14 06:46:34] started TR-final-alibi_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-alibi_s42 --seed 42 --set model.pos_encoding_type=alibi --set evaluation.full_context_batch_size=2048
+[2026-10-14 07:02:57] finished TR-final-hybrid_s42 on GPU 3: rc=0, complete=True, 31.7 min
+[2026-10-14 07:02:57] started TR-final-relative_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-relative_s42 --seed 42 --set model.pos_encoding_type=relative --set evaluation.full_context_batch_size=2048
+[2026-10-14 07:17:17] finished TR-final-alibi_s42 on GPU 2: rc=0, complete=True, 30.7 min
+[2026-10-14 07:17:17] started TR-final-learned_s43 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-learned_s43 --seed 43 --set model.pos_encoding_type=learned --set evaluation.full_context_batch_size=2048
+[2026-10-14 07:33:20] finished TR-final-relative_s42 on GPU 3: rc=0, complete=True, 30.4 min
+[2026-10-14 07:33:20] started TR-final-sinusoidal_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-sinusoidal_s43 --seed 43 --set model.pos_encoding_type=sinusoidal --set evaluation.full_context_batch_size=2048
+[2026-10-14 07:49:02] finished TR-final-learned_s43 on GPU 2: rc=0, complete=True, 31.8 min
+[2026-10-14 07:49:03] started TR-final-hybrid_s43 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-hybrid_s43 --seed 43 --set model.pos_encoding_type=hybrid --set evaluation.full_context_batch_size=2048
+[2026-10-14 08:03:43] finished TR-final-sinusoidal_s43 on GPU 3: rc=0, complete=True, 30.4 min
+[2026-10-14 08:03:43] started TR-final-alibi_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-alibi_s43 --seed 43 --set model.pos_encoding_type=alibi --set evaluation.full_context_batch_size=2048
+[2026-10-14 08:20:48] finished TR-final-hybrid_s43 on GPU 2: rc=0, complete=True, 31.8 min
+[2026-10-14 08:20:48] started TR-final-relative_s43 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-relative_s43 --seed 43 --set model.pos_encoding_type=relative --set evaluation.full_context_batch_size=2048
+[2026-10-14 08:34:06] finished TR-final-alibi_s43 on GPU 3: rc=0, complete=True, 30.4 min
+[2026-10-14 08:34:07] started TR-final-learned_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-learned_s44 --seed 44 --set model.pos_encoding_type=learned --set evaluation.full_context_batch_size=2048
+[2026-10-14 08:51:11] finished TR-final-relative_s43 on GPU 2: rc=0, complete=True, 30.4 min
+[2026-10-14 08:51:11] started TR-final-sinusoidal_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-sinusoidal_s44 --seed 44 --set model.pos_encoding_type=sinusoidal --set evaluation.full_context_batch_size=2048
+[2026-10-14 09:05:52] finished TR-final-learned_s44 on GPU 3: rc=0, complete=True, 31.8 min
+[2026-10-14 09:05:52] started TR-final-hybrid_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-hybrid_s44 --seed 44 --set model.pos_encoding_type=hybrid --set evaluation.full_context_batch_size=2048
+[2026-10-14 09:21:15] finished TR-final-sinusoidal_s44 on GPU 2: rc=0, complete=True, 30.1 min
+[2026-10-14 09:21:15] started TR-final-alibi_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-alibi_s44 --seed 44 --set model.pos_encoding_type=alibi --set evaluation.full_context_batch_size=2048
+[2026-10-14 09:37:38] finished TR-final-hybrid_s44 on GPU 3: rc=0, complete=True, 31.8 min
+[2026-10-14 09:37:38] started TR-final-relative_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-relative_s44 --seed 44 --set model.pos_encoding_type=relative --set evaluation.full_context_batch_size=2048
+[2026-10-14 09:51:58] finished TR-final-alibi_s44 on GPU 2: rc=0, complete=True, 30.7 min
+[2026-10-14 09:51:58] started TR-final-d0.1_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-d0.1_s42 --seed 42 --set model.emb_dropout=0.1 --set model.attn_dropout=0.1 --set model.resid_dropout=0.1 --set model.mlp_dropout=0.1 --set evaluation.full_context_batch_size=2048
+[2026-10-14 10:08:01] finished TR-final-relative_s44 on GPU 3: rc=0, complete=True, 30.4 min
+[2026-10-14 10:08:01] started TR-final-d0.1_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-d0.1_s43 --seed 43 --set model.emb_dropout=0.1 --set model.attn_dropout=0.1 --set model.resid_dropout=0.1 --set model.mlp_dropout=0.1 --set evaluation.full_context_batch_size=2048
+[2026-10-14 10:26:29] finished TR-final-d0.1_s42 on GPU 2: rc=0, complete=True, 34.5 min
+[2026-10-14 10:26:29] started TR-final-d0.1_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-d0.1_s44 --seed 44 --set model.emb_dropout=0.1 --set model.attn_dropout=0.1 --set model.resid_dropout=0.1 --set model.mlp_dropout=0.1 --set evaluation.full_context_batch_size=2048
+[2026-10-14 10:42:31] finished TR-final-d0.1_s43 on GPU 3: rc=0, complete=True, 34.5 min
+[2026-10-14 11:00:51] finished TR-final-d0.1_s44 on GPU 2: rc=0, complete=True, 34.4 min
+[2026-10-14 11:01:11] queue empty
