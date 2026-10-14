@@ -1,8 +1,9 @@
 """
-Export a Transformer run's positional-encoding tables to runs/<run>/pe_tables.json (CPU only, reads the
-best-loss checkpoint). results/v3/aggregate_v3.py draws the PE figures from these files.
+Export a Transformer run's positional-encoding tables to runs/<run>/pe_tables.json (reads the best-loss
+checkpoint; a few seconds). results/v3/aggregate_v3.py draws the PE figures from these files. Needs the GPU
+backend: orbax cannot restore the GPU-saved checkpoints on the CPU backend ("sharding ... Got None").
 
-    JAX_PLATFORMS=cpu python scripts/export_pe_tables.py --run TR-final-learned_s42
+    CUDA_VISIBLE_DEVICES=3 python scripts/export_pe_tables.py --run TR-final-learned_s42
 
 - learned:    the trained (max_len, d_model) table positional_embed;
 - hybrid:     learned_embed, the fixed sinusoidal component and the table actually added to the embeddings;

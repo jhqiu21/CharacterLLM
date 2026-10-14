@@ -7,7 +7,7 @@ Queue the v3 evaluations (prompts/03_final_and_extensions.md, Part 2) on fixed G
   positional encodings (blocks 1-2) and of the LSTMs LR-1 and LR-2;
 - attention analysis (scripts/analyze_attention.py) for seed 42 of the six encodings at W = 128, and of
   rope / alibi / sinusoidal / relative at W = 512;
-- PE tables (scripts/export_pe_tables.py, CPU) for seed 42 of every encoding.
+- PE tables (scripts/export_pe_tables.py, a few seconds on a GPU) for seed 42 of every encoding.
 A job is skipped when its output exists or its run has not finished. GPU rules as in launch_v3.py
 (a GPU is used only without anyone else's process on it). Records: runs/v3_evals_status.jsonl.
 """
@@ -46,7 +46,7 @@ def build_jobs():
         run = tr_run(pe, 42)
         jobs.append((f"attn128:{run}", run, f"runs/{run}/attention_W128/stats.json",
                      [py, "scripts/analyze_attention.py", "--run", run, "--length", "128"], True))
-        jobs.append((f"pe:{run}", run, f"runs/{run}/pe_tables.json", [py, "scripts/export_pe_tables.py", "--run", run], False))
+        jobs.append((f"pe:{run}", run, f"runs/{run}/pe_tables.json", [py, "scripts/export_pe_tables.py", "--run", run], True))
     for pe in EXTRAPOLATING:
         run = tr_run(pe, 42)
         jobs.append((f"attn512:{run}", run, f"runs/{run}/attention_W512/stats.json",
