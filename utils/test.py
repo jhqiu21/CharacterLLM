@@ -9,7 +9,7 @@ def test_checkpoint(model, param, test_data, int_to_char, sequence_length=32, ba
     # pass sequence_length=model.max_len to measure Acc_last at the last trained position.
     data_length = len(test_data)
     num_blocks = (data_length - 1) // sequence_length
-    num_batches = max(1, num_blocks // batch_size)
+    num_batches = max(1, num_blocks // batch_size)  # floors: up to batch_size - 1 tail blocks are not scored (legacy behaviour)
 
     total_loss = 0.0
     total_tok = 0

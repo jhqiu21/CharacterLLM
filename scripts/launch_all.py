@@ -1,5 +1,6 @@
 """
-Queue every Table V / ablation run, one run per free GPU (CUDA_VISIBLE_DEVICES=i).
+Legacy (v1/v2): queue the Table V / ablation runs of results/REPORT.md, one run per free GPU (CUDA_VISIBLE_DEVICES=i).
+The GPU helpers (gpu_state, is_free, descendants) are also used by scripts/launch_v3*.py and scripts/launch_v4.py.
 
     nohup python scripts/launch_all.py > runs/launch_all.log 2>&1 &     # or inside tmux
     python scripts/launch_all.py --smoke     # 300-iteration end-to-end check of every config

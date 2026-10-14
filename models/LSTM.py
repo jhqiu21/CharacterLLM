@@ -1,13 +1,13 @@
-# lstm_baseline.py
 """
-Character-level LSTM baseline (robust, extensible):
+Character-level multi-layer LSTM:
   - Input:  (B, T) int32 token ids
-  - Output: (B, T, V) logits
+  - Output: (B, T, V) logits (untied output matrix W_out)
 Design notes:
-  * No Modules are called inside lax.scan's step to avoid tracer leaks.
-  * All parameters are created once via `self.param` inside `@nn.compact`.
-  * Variational dropout: one mask per layer per batch (shared across time steps).
-  * Optional weight tying with the input embedding.
+  * The recurrence is a jax.lax.scan over time (no fused cuDNN kernel), so its speed is implementation-dependent.
+  * No Modules are called inside the scan step (avoids tracer leaks); the LSTM weights are created once via
+    `self.param` and the token embedding via nn.Embed.
+  * Dropout between layers only, with one mask per sequence and layer, shared across time steps
+    (no dropout on the recurrent state).
 """
 
 import jax
@@ -21,7 +21,6 @@ class CharLSTM(nn.Module):
     n_layers: int
     dropout: float
     max_len: int
-    tie_weights: bool = False  # if True: use E^T for projection
     forget_bias: float = 1.0   # initial forget-gate bias (Gers et al. 2000); 0.0 = the original all-zero bias
 
     @nn.compact
@@ -98,7 +97,7 @@ class CharLSTM(nn.Module):
                 c_new = f_gate * c_prev + i_gate * g_gate
                 h_new = o_gate * jnp.tanh(c_new)
 
-                # apply variational dropout mask between layers (skip on last layer)
+                # dropout mask between layers (time-shared; all ones on the last layer)
                 h_out = h_new * masks[i]
                 new_states.append((c_new, h_new))
                 h_in = h_out  # feed to next layer
@@ -111,12 +110,8 @@ class CharLSTM(nn.Module):
         _, hs_tm = jax.lax.scan(step, init_states, x_tm)
         hs = jnp.swapaxes(hs_tm, 0, 1)    # (B, T, H)
 
-        # 7) Output projection (weight tying optional)
-        if self.tie_weights:
-            # embed.embedding: (V, H) -> use E^T: (H, V)
-            logits = hs @ embed.embedding.T  # (B, T, V)
-        else:
-            W_out = self.param("W_out", nn.initializers.lecun_normal(), (H, self.vocab_size))
-            logits = hs @ W_out  # (B, T, V)
+        # 7) Output projection (untied)
+        W_out = self.param("W_out", nn.initializers.lecun_normal(), (H, self.vocab_size))
+        logits = hs @ W_out  # (B, T, V)
 
         return logits

@@ -1,6 +1,6 @@
 """
 Plotting utilities for training visualization.
-This module contains all plotting functions extracted from the original notebook.
+Used by train.py (training_curves.pdf of every run) and the notebook.
 """
 
 import numpy as np
@@ -108,11 +108,10 @@ def plot_training_curves(metrics_logger, save_path='training_curves.pdf'):
     ax5.set_title("Loss Convergence (Smoothed)", fontsize=12, fontweight='bold')
     ax5.grid(alpha=0.3)
 
+    # ===== Panel 6: empty (layout symmetry), hidden before saving =====
+    axes[1, 2].axis('off')
+
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     print(f"\nFigure saved to '{save_path}'")
-    plt.show()
-
-    # ===== Plot 7: Empty (for layout symmetry) =====
-    ax6 = axes[1, 2]
-    ax6.axis('off')  # Hide the empty subplot
+    plt.show()  # displays the figure in the notebook; no-op under the Agg backend used by train.py

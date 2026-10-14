@@ -1,4 +1,5 @@
 """
+Not used for any result (the scaling study was not run; results/v3/REPORT.md section 8).
 Write configs/scaling/{TR,LSTM}_<size>.yaml: configs/final/TR.yaml and configs/final/LSTM.yaml with only the size
 changed (and model_name, so run names stay distinct). Exact parameter counts come from initialising the real model.
 

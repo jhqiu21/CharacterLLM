@@ -1,7 +1,7 @@
 """
-Canonical training + evaluation entry point (the logic formerly in transformer.ipynb).
+Canonical training + evaluation entry point (transformer.ipynb is an interactive front end built on these functions).
 
-    python train.py --config configs/TR2o.yaml --seed 4212 [--run-name NAME] [--legacy-dropout-rng]
+    python train.py --config configs/final/TR.yaml --seed 42 [--run-name NAME] [--legacy-dropout-rng]
                     [--set section.key=value ...] [--tuning] [--data-dir DIR]
                     [--epochs N] [--val-interval N] [--fc-stride S] [--eval-only]
 
@@ -13,17 +13,22 @@ best-loss checkpoint is then scored with full-context evaluation on the validati
 --epochs / --val-interval / --fc-stride are for smoke tests only. --eval-only re-runs the final
 evaluation from the checkpoints of an existing run. GPU selection comes from CUDA_VISIBLE_DEVICES.
 
-Differences from the original notebook (everything else is unchanged):
+Intentional differences from the original course notebook (results/code_changes_v2.md has the details):
   * the dropout key advances every step (--legacy-dropout-rng restores the old fixed key);
   * init / dropout keys and batch sampling are seeded from --seed;
   * optional weight-decay mask (optimizer.decay_mask) that skips biases, LayerNorm and rel_embed;
   * validation uses one fixed set of 1024 windows of length training.sequence_length (seed 0);
   * the loss is built by make_loss_and_metrics(config) instead of closing over a global config; the training
     step uses it too (the lean make_train_loss(config) has the same loss and gradients but compiles to a
-    slower TR2o step, results/code_changes_v2.md section 3);
+    slower step, results/code_changes_v2.md section 3);
   * the warmup-cosine schedule reaches end_value at the last iteration (the notebook's reached 0 at epochs - warmup);
+  * model defaults: one attention implementation for every positional encoding (no nn.SelfAttention), sinusoidal
+    tables scaled to unit row norm (model.sinusoidal_scale), LSTM forget-gate bias 1.0 (model.forget_bias);
+  * generation places the prompt at the start of the window (no left padding);
   * test evaluation in three modes (legacy32, chunked128, full_context), written to eval.json, plus
     single-prompt and multi-prompt Self-BLEU.
+Additions not in the notebook: pos_encoding_type 'none' (NoPE) and the evaluation-only model options used by
+utils/extrapolation_eval.py and scripts/analyze_attention.py (capture_attn, rel_clamp, pos_scale).
 """
 
 import argparse

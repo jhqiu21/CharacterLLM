@@ -135,7 +135,7 @@ def get_alibi_slopes(n_heads: int):
 
 def get_alibi_bias(n_heads: int, seq_len: int):
     """Generate ALiBi bias matrix for attention scores."""
-    # Distance matrix: distance[i, j] = i - j (how far back in sequence)
+    # Distance matrix: distance[i, j] = j - i (only |i - j| is used below)
     distances = jnp.arange(seq_len)[None, :] - jnp.arange(seq_len)[:, None]
 
     # Get slopes for each head

@@ -63,20 +63,6 @@ def save_collected_checkpoints(checkpoints_to_save, stage_dir, best_dir):
         )
         print(f"\t Saved (acc_last: {100*ckpt_state['val_acc_last']:.2f}%)")
 
-    # save best loss_last checkpoint
-    if checkpoints_to_save.get('best_perplexity') is not None:
-        step, ckpt_state = checkpoints_to_save['best_perplexity']
-        print(f"\t Saving best perplexity checkpoint (step {step:,})...")
-        checkpoints.save_checkpoint(
-            ckpt_dir=str(best_dir),
-            target=ckpt_state,
-            step=step,
-            prefix='best_perplexity_',
-            keep=1,
-            overwrite=True,
-        )
-        print(f"\t Saved (loss: {ckpt_state['val_loss']:.4f})")
-
     print("ALL CHECKPOINTS SAVED")
 
 

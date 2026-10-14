@@ -1,6 +1,7 @@
 """
 Performance analysis utilities for model evaluation.
-This module contains all performance analysis functions extracted from the original notebook.
+Note: the 'test_*' names (printed labels and training_results.json keys, kept for compatibility) refer to the fixed
+validation set evaluated during training, not to the test split.
 """
 
 import numpy as np
@@ -33,14 +34,14 @@ def analyze_training_performance(
     acc_last_test_history = np.array(acc_last_test_history)
     iteration_history = np.array(iteration_history)
 
-    # === Best Test Loss ===
+    # === Best validation loss ('test' in the names: see the module docstring) ===
     best_test_loss_idx = np.argmin(loss_test_history)
     best_test_loss = loss_test_history[best_test_loss_idx]
     best_test_loss_iter = iteration_history[best_test_loss_idx]
 
-    print(f"\nBest Test Loss:    {best_test_loss:.4f}  (at iteration {best_test_loss_iter:,})")
+    print(f"\nBest Validation Loss:    {best_test_loss:.4f}  (at iteration {best_test_loss_iter:,})")
 
-    # === Best Test Last Character Loss ===
+    # === Best validation last-character loss ===
     best_test_loss_last_idx = np.argmin(loss_last_test_history)
     best_test_loss_last = loss_last_test_history[best_test_loss_last_idx]
     best_test_loss_last_iter = iteration_history[best_test_loss_last_idx]
@@ -131,31 +132,3 @@ def analyze_training_performance(
         print(f"\nResults saved to '{results_path}'")
 
     return results
-
-
-def get_summary_metrics(results):
-    best_test_loss = results['best']['test_loss']
-    best_test_loss_iter = results['best']['test_loss_iter']
-    best_test_loss_last = results['best']['test_loss_last']
-    best_test_loss_last_iter = results['best']['test_loss_last_iter']
-    best_test_acc = results['best']['test_acc']
-    best_test_acc_iter = results['best']['test_acc_iter']
-    best_test_acc_last = results['best']['test_acc_last']
-    best_test_acc_last_iter = results['best']['test_acc_last_iter']
-
-    # For final metrics, we need to return numpy arrays for plotting
-    final_loss_mean = results['final_avg']['test_loss_mean']
-    final_loss_std = results['final_avg']['test_loss_std']
-    final_acc_mean = results['final_avg']['test_acc_mean']
-    final_acc_std = results['final_avg']['test_acc_std']
-    final_acc_last_mean = results['final_avg']['test_acc_last_mean']
-    final_acc_last_std = results['final_avg']['test_acc_last_std']
-
-    # Create dummy arrays for compatibility with plotting functions
-    n_final = results['final_avg']['n_checkpoints']
-    final_loss = np.full(n_final, final_loss_mean)
-    final_acc = np.full(n_final, final_acc_mean)
-    final_acc_last = np.full(n_final, final_acc_last_mean)
-
-    return (best_test_loss, best_test_loss_iter, best_test_loss_last, best_test_loss_last_iter, best_test_acc, best_test_acc_iter,
-            best_test_acc_last, best_test_acc_last_iter, final_loss, final_acc, final_acc_last)

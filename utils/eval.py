@@ -131,18 +131,6 @@ def expected_calibration_error(logits, targets, n_bins=20):
     return ece, calibration_data
 
 
-def brier_score(logits, targets):
-    # Measures the MSE between predicted probabilities and actual outcomes.
-    probs = jax.nn.softmax(logits, axis=-1)
-    vocab_size = logits.shape[-1]
-    targets_one_hot = jax.nn.one_hot(targets, vocab_size)
-
-    squared_diff = (probs - targets_one_hot) ** 2
-    brier = jnp.mean(squared_diff)
-
-    return brier
-
-
 def prediction_entropy(logits):
     # Entropy of predictions (uncertainty measure).
     # High: model is uncertain
@@ -156,39 +144,6 @@ def prediction_entropy(logits):
     entropy_by_position = jnp.mean(entropy, axis=0)
 
     return avg_entropy, entropy_by_position
-
-
-def confidence_distribution(logits, targets):
-    # Analyze confidence distribution.
-    probs = jax.nn.softmax(logits, axis=-1)
-
-    # Top-1 confidence
-    top1_conf = jnp.max(probs, axis=-1)
-
-    # Top-5 cumulative confidence
-    top5_probs = jnp.sort(probs, axis=-1)[:, :, -5:]
-    top5_conf = jnp.sum(top5_probs, axis=-1)
-
-    # Correct predictions
-    predictions = jnp.argmax(probs, axis=-1)
-    correct = (predictions == targets).astype(jnp.float32)
-
-    # Confidence of correct predictions
-    correct_mask = correct[..., None]
-    correct_conf = jnp.sum(top1_conf * correct) / jnp.sum(correct)
-
-    # Confidence of incorrect predictions
-    incorrect_mask = (1 - correct)
-    incorrect_conf = jnp.sum(top1_conf * incorrect_mask) / jnp.sum(incorrect_mask)
-
-    return {
-        'mean_confidence': jnp.mean(top1_conf),
-        'median_confidence': jnp.median(top1_conf),
-        'mean_top5_confidence': jnp.mean(top5_conf),
-        'correct_confidence': correct_conf,
-        'incorrect_confidence': incorrect_conf,
-        'confidence_gap': correct_conf - incorrect_conf,
-    }
 
 
 def token_frequency_analysis(logits, targets, top_percent=0.2):
@@ -253,10 +208,10 @@ def self_bleu(
     n_grams: int = 4,
     n_samples: int = 20,
     ngram_size=None) -> float:
-    """
-    model, config, int_to_char, char_to_int, char_set: defined else where in the cells before
-    params: defined in the loop
-    prompt, gen_len, temperature, sample, seed: defined at the start of the evaluation cell
+    """Self-BLEU-n of n_samples continuations of one prompt (generated with utils.generation.generate_tokens).
+
+    config is used for the window length (config.model.max_len); prompt, gen_len, temperature, sample and seed
+    control generation; ngram_size enables n-gram blocking.
     n_grams: number of grams for self-BLEU (default: 4)
     n_samples: number of samples to generate for self-BLEU (default: 20)
     """

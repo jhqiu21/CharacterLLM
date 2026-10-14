@@ -1,5 +1,6 @@
 """
-Log the GPU compute processes every few seconds, with timestamps, to runs/gpu_usage.jsonl.
+Legacy (v1 throughput table, results/throughput.md): log the GPU compute processes every few seconds, with timestamps,
+to runs/gpu_usage.jsonl.
 
     nohup python scripts/gpu_sampler.py &      # or inside tmux
 

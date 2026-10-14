@@ -4,14 +4,6 @@ import jax.numpy as jnp
 from collections import defaultdict
 
 
-def sample_categorical(rng, logits, temperature=1.0):
-    """Sample from categorical distribution given by logits with temperature."""
-    # logits: (B, V)
-    if temperature != 1.0:
-        logits = logits / temperature
-    return jax.random.categorical(rng, logits, axis=-1)
-
-
 def initial_window(context, block_size, fill_token=None):
     """Place the prompt at positions 0..S-1 of a fixed (B, block_size) window.
 
@@ -127,9 +119,6 @@ def generate_tokens(model, params, rng, context, length, block_size=64, temperat
 
     # return shape (1, length) to match original interface
     return jnp.array([generated_tokens], dtype=jnp.int32)
-# example usage:
-# generated = generate_tokens(model, params, rng, context, length=100, block_size=64, temperature=1.0, sample=True)
-# print(generated)  # (B, 100) array of generated token ids
 
 
 def block_repeated_ngrams(logits, history, n):

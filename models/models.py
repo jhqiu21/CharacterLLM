@@ -20,7 +20,6 @@ from .positional_encodings import (
     RelativePositionalEncoding
 )
 
-POS_ENCODING_TYPES = ("learned", "sinusoidal", "hybrid", "rope", "alibi", "relative", "none")
 POS_SCALE_TYPES = ("rope", "sinusoidal")  # encodings that support evaluation-time position interpolation
 
 
@@ -205,6 +204,11 @@ class DecoderBlock(nn.Module):
     Args:
       d_model: Hidden size D.
       n_heads: Number of attention heads.
+      mlp_dropout, attn_dropout, resid_dropout: dropout rates of the MLP output, the attention weights and the
+        attention output.
+      mlp_ratio: MLP expansion factor.
+      pos_encoding_type, max_len: passed to MultiHeadAttentionWithPE.
+      capture_attn, rel_table_len, rel_clamp, pos_scale: evaluation-only options of MultiHeadAttentionWithPE.
 
     Input/Output shape: (B, T, D)
     """
