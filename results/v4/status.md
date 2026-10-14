@@ -27,11 +27,22 @@ Both optima are bracketed; no 50k run was added (`tables/lr_bracket.md`).
 - Part 2: `raw/`, `aggregate_v4.py`, `tables/`, `figures/`, `REPORT.md`, `claims.md` + `check_claims.py`.
 - Part 3: README rewrite, `results/README.md`, code clean-up, `environment.yml` (verified: fresh env, 290 passed),
   `scripts/prepare_data.py` (verified md5s), dataset untracked, notebook re-checked, local `CLAUDE.md` updated.
+- Part 4: report rewritten in the paper repository `/home/jinhang/charllm_paper/` (pulled from Overleaf first;
+  committed locally as `44b456e` (the user's pending edits) and `4a017bf` (the rewrite); **not pushed**). New title in the macro
+  `\papertitle`, structure as specified, related work with verified references and text8 numbers, tables `\input` from
+  `tables/v4/` and figures from `image/v4/` (copied by `results/v4/export_paper.py`), revision colouring and superseded runs
+  removed, pilot experiments in one appendix section. Builds with `pdflatex` (14 pages: about 8.5 of main text, references,
+  appendix) with no errors, no undefined references or citations and no overfull boxes; every page checked visually.
+  `claims.md` lists every number in the text; `check_claims.py`: 108 checked, 0 failed.
 
 ## Not done / open questions for the user
 
-- **`report/` was missing from this repository.** The report source is the separate Overleaf-connected repository
-  `/home/jinhang/charllm_paper/` (user instruction: pull first, commit there locally, never push; no PDF copied into this repository).
+- **Push the paper.** The paper repository is 2 commits ahead of `origin/main` (Overleaf); review and push yourself.
+  The compiled `main.pdf` there is untracked; no PDF was copied into this repository (your decision), so the README says the
+  write-up is maintained separately.
+- **Pilot numbers** (appendix C of the report) come only from the original course report; their raw logs were not kept, so they
+  are listed in `claims.md` as `pilot` rather than traced to a results file. Drop the two pilot tables if every number must be
+  regenerable.
 - **Dataset in git history.** `data/text8_*.txt` (95 MB) are untracked now but remain in earlier commits. Purging them needs a
   history rewrite (e.g. `git filter-repo --path data/ --invert-paths`) when the new repository is split off.
 - `results/v3/raw/*/attention_W*/example.npz` (13 MB) stay tracked because the heatmap figures and `results/v3/REPORT.md` use them.

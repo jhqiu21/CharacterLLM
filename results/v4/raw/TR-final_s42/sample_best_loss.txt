@@ -1,0 +1,26 @@
+Best Loss
+
+Step: 49999
+Validation Loss: 1.0922
+Validation BPC: 1.5757
+Validation Perplexity: 2.9808
+Validation Acc (Last): 67.68%
+Validation Acc: 66.18%
+Validation ECE: 0.0061
+
+[legacy32: non-overlapping 32-char blocks]
+Test Perplexity: 3.3517
+Test BPC: 1.7449
+Test Acc: 61.98%
+Test Acc (Last): 66.75%
+Test Avg Rare Acc: 41.31%
+Test Avg Common Acc: 73.53%
+Test Avg Distinct: 0.02
+Test Coherence: 0.87
+
+[chunked128] BPC 1.5489  Acc 66.39%  Acc (Last) 68.57%
+[full_context W=128 S=1] BPC 1.4595  PPL 2.7500  Acc 68.42%  ECE 0.0032  Rare 49.90%  Common 79.90%
+Self-BLEU-4: 0.1884
+Self-BLEU-4 (multi-prompt, 10 validation prompts x 20 samples): 0.1364 +- 0.0219
+
+hello my friend and the miss dissatisford s film of the series family crickets are considered the first modern commentary criticism of the series critical theory developed in the study of the series the action of the series a series of series continued he was made to aid in the film in one nine seven three at the series he was only a two version of his team the one nine seven four novel by david peterson in the beatles by editor of the one nine eight zero s and the one nine nine zero s and one nine nine zero s for the one nine eight zero s so that he left his return to london and invited the position with a severed garden to the campaign of one nine three two and he had said that the power planned to pass through these works when a member is a professional company whose line of any project was released as a second company it is often considered the first production communications in east asia and is a controlled sample of control via samples this exploration of changes in the continent has differe

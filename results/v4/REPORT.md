@@ -190,8 +190,8 @@ last 8 characters); the word-boundary head weakens from 0.282 to 0.169. The diff
 
 ## 6. Deviations, limitations and what went wrong
 
-1. **`report/` was not in the repository.** The report source is the separate (Overleaf-connected) repository given by the user;
-   Part 4 works there. The compiled PDF is not copied into this repository (user decision).
+1. **The report source is not in this repository.** It lives in a separate Overleaf-connected repository (user decision); the
+   compiled PDF is not copied here.
 2. **Dataset was tracked in git.** `data/text8_train.txt` (90 MB) and `data/text8_test.txt` were committed in earlier history
    despite `.gitignore`. They are now untracked (`git rm --cached`); `scripts/prepare_data.py` recreates both from text8 and checks the
    md5s against `results/v3/env.txt` (verified). **They are still in the git history**; purging needs a history rewrite, left to the
@@ -234,6 +234,7 @@ last 8 characters); the word-boundary head weakens from 0.282 to 0.169. The diff
 | `raw/TR-final{,-sinusoidal}_s*/` | v4 outputs for v3 runs only: `extrapolation_pi.json`, `attention_W512_pi/` (RoPE seed 42) |
 | `raw/bracket_*/` | `val_eval.json`, `config.yaml`, `val_history.json` |
 | `raw/v4_status.jsonl`, `raw/launch_v4.txt` | launcher records and log |
-| `claims.md` | every number in the report and its source |
+| `claims.md`, `check_claims.py` | every number in the report and its source; the checker verifies the table-backed ones |
+| `export_paper.py` | copies `tables/*.tex` and `figures/*.pdf` into the report's LaTeX source |
 | `status.md` | task status and open questions |
 | `test_output.txt` | final `pytest` summary |
