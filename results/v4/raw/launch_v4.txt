@@ -1,0 +1,66 @@
+[2026-10-14 14:41:03] GPUs [2, 3]; skipped (finished): []
+Queue:
+  TR-final-nope_s42: train.py --config configs/final/TR.yaml --run-name TR-final-nope_s42 --seed 42 --set model.pos_encoding_type=none --set evaluation.full_context_batch_size=2048
+  TR-final-nope_s43: train.py --config configs/final/TR.yaml --run-name TR-final-nope_s43 --seed 43 --set model.pos_encoding_type=none --set evaluation.full_context_batch_size=2048
+  TR-final-nope_s44: train.py --config configs/final/TR.yaml --run-name TR-final-nope_s44 --seed 44 --set model.pos_encoding_type=none --set evaluation.full_context_batch_size=2048
+  pi:TR-final_s42: scripts/eval_extrapolation.py --run TR-final_s42 --lengths 128 256 512 1024 --interpolate
+  pi:TR-final_s43: scripts/eval_extrapolation.py --run TR-final_s43 --lengths 128 256 512 1024 --interpolate
+  pi:TR-final_s44: scripts/eval_extrapolation.py --run TR-final_s44 --lengths 128 256 512 1024 --interpolate
+  pi:TR-final-sinusoidal_s42: scripts/eval_extrapolation.py --run TR-final-sinusoidal_s42 --lengths 128 256 512 1024 --interpolate
+  pi:TR-final-sinusoidal_s43: scripts/eval_extrapolation.py --run TR-final-sinusoidal_s43 --lengths 128 256 512 1024 --interpolate
+  pi:TR-final-sinusoidal_s44: scripts/eval_extrapolation.py --run TR-final-sinusoidal_s44 --lengths 128 256 512 1024 --interpolate
+  attn512pi:TR-final_s42: scripts/analyze_attention.py --run TR-final_s42 --length 512 --interpolate
+  bracket_TR_lr2.7e-3: train.py --config configs/final/TR.yaml --run-name bracket_TR_lr2.7e-3 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=2.7e-3 --set evaluation.full_context_batch_size=2048
+  bracket_TR_lr4.05e-3: train.py --config configs/final/TR.yaml --run-name bracket_TR_lr4.05e-3 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=4.05e-3 --set evaluation.full_context_batch_size=2048
+  bracket_TR_lr6.075e-3: train.py --config configs/final/TR.yaml --run-name bracket_TR_lr6.075e-3 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=6.075e-3 --set evaluation.full_context_batch_size=2048
+  bracket_LSTM_lr7.2e-3: train.py --config configs/final/LSTM.yaml --run-name bracket_LSTM_lr7.2e-3 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=7.2e-3 --set evaluation.full_context_batch_size=2048
+  bracket_LSTM_lr1.08e-2: train.py --config configs/final/LSTM.yaml --run-name bracket_LSTM_lr1.08e-2 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=1.08e-2 --set evaluation.full_context_batch_size=2048
+  bracket_LSTM_lr1.62e-2: train.py --config configs/final/LSTM.yaml --run-name bracket_LSTM_lr1.62e-2 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=1.62e-2 --set evaluation.full_context_batch_size=2048
+  extrap:TR-final-nope_s42: scripts/eval_extrapolation.py --run TR-final-nope_s42 --lengths 128 256 512 1024 --sanity
+  extrap:TR-final-nope_s43: scripts/eval_extrapolation.py --run TR-final-nope_s43 --lengths 128 256 512 1024 --sanity
+  extrap:TR-final-nope_s44: scripts/eval_extrapolation.py --run TR-final-nope_s44 --lengths 128 256 512 1024 --sanity
+  attn128:TR-final-nope_s42: scripts/analyze_attention.py --run TR-final-nope_s42 --length 128
+  attn512:TR-final-nope_s42: scripts/analyze_attention.py --run TR-final-nope_s42 --length 512
+[2026-10-14 14:41:03] started TR-final-nope_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-nope_s42 --seed 42 --set model.pos_encoding_type=none --set evaluation.full_context_batch_size=2048
+[2026-10-14 14:41:03] started TR-final-nope_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-nope_s43 --seed 43 --set model.pos_encoding_type=none --set evaluation.full_context_batch_size=2048
+[2026-10-14 15:11:50] finished TR-final-nope_s42 on GPU 2: rc=0, complete=True, 30.8 min
+[2026-10-14 15:11:50] finished TR-final-nope_s43 on GPU 3: rc=0, complete=True, 30.8 min
+[2026-10-14 15:11:50] started TR-final-nope_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name TR-final-nope_s44 --seed 44 --set model.pos_encoding_type=none --set evaluation.full_context_batch_size=2048
+[2026-10-14 15:11:50] started pi:TR-final_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final_s42 --lengths 128 256 512 1024 --interpolate
+[2026-10-14 15:13:53] finished pi:TR-final_s42 on GPU 3: rc=0, complete=True, 2.1 min
+[2026-10-14 15:13:53] started pi:TR-final_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final_s43 --lengths 128 256 512 1024 --interpolate
+[2026-10-14 15:15:57] finished pi:TR-final_s43 on GPU 3: rc=0, complete=True, 2.1 min
+[2026-10-14 15:15:57] started pi:TR-final_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final_s44 --lengths 128 256 512 1024 --interpolate
+[2026-10-14 15:18:00] finished pi:TR-final_s44 on GPU 3: rc=0, complete=True, 2.0 min
+[2026-10-14 15:18:00] started pi:TR-final-sinusoidal_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-sinusoidal_s42 --lengths 128 256 512 1024 --interpolate
+[2026-10-14 15:20:03] finished pi:TR-final-sinusoidal_s42 on GPU 3: rc=0, complete=True, 2.1 min
+[2026-10-14 15:20:03] started pi:TR-final-sinusoidal_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-sinusoidal_s43 --lengths 128 256 512 1024 --interpolate
+[2026-10-14 15:22:07] finished pi:TR-final-sinusoidal_s43 on GPU 3: rc=0, complete=True, 2.1 min
+[2026-10-14 15:22:07] started pi:TR-final-sinusoidal_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-sinusoidal_s44 --lengths 128 256 512 1024 --interpolate
+[2026-10-14 15:24:10] finished pi:TR-final-sinusoidal_s44 on GPU 3: rc=0, complete=True, 2.1 min
+[2026-10-14 15:24:10] started attn512pi:TR-final_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_attention.py --run TR-final_s42 --length 512 --interpolate
+[2026-10-14 15:24:51] finished attn512pi:TR-final_s42 on GPU 3: rc=0, complete=True, 0.7 min
+[2026-10-14 15:24:51] started bracket_TR_lr2.7e-3 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name bracket_TR_lr2.7e-3 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=2.7e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 15:31:20] finished bracket_TR_lr2.7e-3 on GPU 3: rc=0, complete=True, 6.5 min
+[2026-10-14 15:31:20] started bracket_TR_lr4.05e-3 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name bracket_TR_lr4.05e-3 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=4.05e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 15:37:49] finished bracket_TR_lr4.05e-3 on GPU 3: rc=0, complete=True, 6.5 min
+[2026-10-14 15:37:49] started bracket_TR_lr6.075e-3 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/TR.yaml --run-name bracket_TR_lr6.075e-3 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=6.075e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 15:42:56] finished TR-final-nope_s44 on GPU 2: rc=0, complete=True, 31.1 min
+[2026-10-14 15:42:56] started bracket_LSTM_lr7.2e-3 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name bracket_LSTM_lr7.2e-3 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=7.2e-3 --set evaluation.full_context_batch_size=2048
+[2026-10-14 15:44:18] finished bracket_TR_lr6.075e-3 on GPU 3: rc=0, complete=True, 6.5 min
+[2026-10-14 15:44:18] started bracket_LSTM_lr1.08e-2 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name bracket_LSTM_lr1.08e-2 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=1.08e-2 --set evaluation.full_context_batch_size=2048
+[2026-10-14 15:55:12] finished bracket_LSTM_lr7.2e-3 on GPU 2: rc=0, complete=True, 12.3 min
+[2026-10-14 15:55:12] started bracket_LSTM_lr1.62e-2 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config configs/final/LSTM.yaml --run-name bracket_LSTM_lr1.62e-2 --seed 4212 --tuning --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.validation_interval=500 --set training.learning_rate=1.62e-2 --set evaluation.full_context_batch_size=2048
+[2026-10-14 15:56:34] finished bracket_LSTM_lr1.08e-2 on GPU 3: rc=0, complete=True, 12.3 min
+[2026-10-14 15:56:34] started extrap:TR-final-nope_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-nope_s42 --lengths 128 256 512 1024 --sanity
+[2026-10-14 16:02:43] finished extrap:TR-final-nope_s42 on GPU 3: rc=0, complete=True, 6.1 min
+[2026-10-14 16:02:43] started extrap:TR-final-nope_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-nope_s43 --lengths 128 256 512 1024 --sanity
+[2026-10-14 16:07:29] finished bracket_LSTM_lr1.62e-2 on GPU 2: rc=0, complete=True, 12.3 min
+[2026-10-14 16:07:30] started extrap:TR-final-nope_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-nope_s44 --lengths 128 256 512 1024 --sanity
+[2026-10-14 16:08:51] finished extrap:TR-final-nope_s43 on GPU 3: rc=0, complete=True, 6.1 min
+[2026-10-14 16:08:51] started attn128:TR-final-nope_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_attention.py --run TR-final-nope_s42 --length 128
+[2026-10-14 16:09:12] finished attn128:TR-final-nope_s42 on GPU 3: rc=0, complete=True, 0.3 min
+[2026-10-14 16:09:12] started attn512:TR-final-nope_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_attention.py --run TR-final-nope_s42 --length 512
+[2026-10-14 16:09:32] finished attn512:TR-final-nope_s42 on GPU 3: rc=0, complete=True, 0.3 min
+[2026-10-14 16:13:38] finished extrap:TR-final-nope_s44 on GPU 2: rc=0, complete=True, 6.1 min
+[2026-10-14 16:13:58] queue empty; failed: []

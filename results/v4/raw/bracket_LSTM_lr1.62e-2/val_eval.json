@@ -1,0 +1,263 @@
+{
+  "run_name": "bracket_LSTM_lr1.62e-2",
+  "model_name": "LSTM-final",
+  "model_type": "lstm",
+  "pos_encoding_type": null,
+  "seed": 4212,
+  "legacy_dropout_rng": false,
+  "decay_mask": true,
+  "num_params": 3177052,
+  "config_file": "configs/final/LSTM.yaml",
+  "overrides": {
+    "training.epochs": 10000,
+    "scheduler.warmup_iters": 2000,
+    "training.validation_interval": 500,
+    "training.learning_rate": 0.0162,
+    "evaluation.full_context_batch_size": 2048
+  },
+  "git_commit": "3197e6a63ee7c2bd52baaede27b96b96705356fd",
+  "eval_git_commit": "3197e6a63ee7c2bd52baaede27b96b96705356fd",
+  "device": "NVIDIA GeForce RTX 3090",
+  "split": "validation",
+  "frequency_groups": {
+    "rare_ids": [
+      16,
+      9,
+      23,
+      25,
+      10
+    ],
+    "common_ids": [
+      13,
+      0,
+      19,
+      4,
+      26
+    ],
+    "rare": [
+      {
+        "id": 16,
+        "char": "q",
+        "train_freq": 0.0008651461988304094
+      },
+      {
+        "id": 9,
+        "char": "j",
+        "train_freq": 0.0016696608187134502
+      },
+      {
+        "id": 23,
+        "char": "x",
+        "train_freq": 0.002931719298245614
+      },
+      {
+        "id": 25,
+        "char": "z",
+        "train_freq": 0.0036927251461988304
+      },
+      {
+        "id": 10,
+        "char": "k",
+        "train_freq": 0.004894339181286549
+      }
+    ],
+    "common": [
+      {
+        "id": 13,
+        "char": "n",
+        "train_freq": 0.06582063157894737
+      },
+      {
+        "id": 0,
+        "char": "a",
+        "train_freq": 0.06608659649122807
+      },
+      {
+        "id": 19,
+        "char": "t",
+        "train_freq": 0.06954843274853802
+      },
+      {
+        "id": 4,
+        "char": "e",
+        "train_freq": 0.10664908771929825
+      },
+      {
+        "id": 26,
+        "char": " ",
+        "train_freq": 0.1699996842105263
+      }
+    ],
+    "top_percent": 0.2,
+    "n_per_group": 5
+  },
+  "throughput": {
+    "s_per_step_median": 0.06669101119041443,
+    "tokens_per_s": 245670.28910719065,
+    "timing_iterations": "iterations [1000, 2000) excluding validation iterations",
+    "n_timed_steps": 998,
+    "s_per_step_mean_all_iterations_incl_validation": 0.0678681577205658,
+    "total_train_time_s": 678.681577205658,
+    "batch_size": 128,
+    "sequence_length": 128,
+    "device": "NVIDIA GeForce RTX 3090",
+    "cuda_visible_devices": "2",
+    "peak_device_memory_gib_training": 1.27
+  },
+  "checkpoints": {
+    "best_loss_all_": {
+      "step": 9999,
+      "val_loss": 1.1739531755447388,
+      "val_bpc": 1.6936564445495605,
+      "val_perplexity": 3.234754800796509,
+      "val_acc": 0.6321029663085938,
+      "val_acc_last": 0.638671875,
+      "ECE": 0.0042581637389957905,
+      "full_context": {
+        "bpc": 1.6325175475109632,
+        "loss": 1.1315749352718607,
+        "perplexity": 3.1005358000185153,
+        "acc": 0.6445994765776615,
+        "ece": 0.004145318642522312,
+        "acc_rare": 0.43001252826995984,
+        "acc_common": 0.7737561540635238,
+        "n_scored": 4499999,
+        "n_targets_expected": 4499999,
+        "window": 128,
+        "stride": 8,
+        "min_context_after_first_window": 121,
+        "n_windows": 562485,
+        "batch_size": 2048,
+        "seconds": 27.492380142211914,
+        "ece_bins": {
+          "n_bins": 20,
+          "count": [
+            0,
+            33322,
+            228417,
+            237149,
+            223118,
+            206023,
+            210281,
+            201728,
+            183183,
+            174643,
+            173888,
+            151503,
+            137340,
+            132806,
+            134546,
+            143455,
+            157906,
+            193996,
+            285569,
+            1291126
+          ],
+          "conf_sum": [
+            0.0,
+            3117.954327940941,
+            28556.764686584473,
+            41552.3850402832,
+            50022.24622344971,
+            56661.74327087402,
+            68337.58248901367,
+            75579.80319213867,
+            77794.43135070801,
+            82961.92015075684,
+            91193.28520202637,
+            87031.27830505371,
+            85810.04389953613,
+            89630.05484008789,
+            97567.87065124512,
+            111225.14140319824,
+            130360.09799194336,
+            169973.67190551758,
+            264726.0143432617,
+            1277464.1330566406
+          ],
+          "correct_sum": [
+            0,
+            3038,
+            26961,
+            40621,
+            49584,
+            56226,
+            68057,
+            76129,
+            78325,
+            83706,
+            92356,
+            88069,
+            86530,
+            90379,
+            98608,
+            112617,
+            132081,
+            171657,
+            266788,
+            1278965
+          ]
+        },
+        "class_count": [
+          298332,
+          53593,
+          123588,
+          126976,
+          473344,
+          87599,
+          74068,
+          159499,
+          294485,
+          6298,
+          21718,
+          163296,
+          101033,
+          295501,
+          290967,
+          74827,
+          4201,
+          243247,
+          245145,
+          310565,
+          100025,
+          44358,
+          56142,
+          13794,
+          55172,
+          15450,
+          766776
+        ],
+        "class_correct": [
+          163972,
+          15403,
+          56225,
+          78059,
+          351671,
+          36260,
+          44454,
+          114524,
+          156040,
+          432,
+          9606,
+          80895,
+          38879,
+          223724,
+          169971,
+          23088,
+          441,
+          156777,
+          129802,
+          209392,
+          42487,
+          21215,
+          15629,
+          7893,
+          35226,
+          8057,
+          710575
+        ]
+      }
+    }
+  },
+  "peak_device_memory_gib": 1.27
+}
