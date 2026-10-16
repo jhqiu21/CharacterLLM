@@ -1,6 +1,6 @@
-Short-range attention, seed 42: head-mean distance profile per layer (layers 0 / 1 / 2 / 3), all queries of the window. Peak: distance (0-16) with the largest mean weight. Position interpolation at W=512 maps 4 characters onto one trained position step.
+Short-range attention, seed 42: head-mean distance profile per layer (layers 0 / 1 / 2 / 3), all queries of the window. The profile at distance d averages the weight over queries i >= d, so its sum over d = 0-2 is not a per-query attention mass. d = 0: the query's own (current input) character. Peak: distance (0-16) with the largest mean weight. Position interpolation at W=512 maps 4 characters onto one trained position step.
 
-| Model | Peak distance (chars) | Mean weight on distances 0-2 |
+| Model | Peak distance (chars) | Profile summed over d = 0-2 |
 |---|---|---|
 | RoPE, W=128 | 1 / 1 / 1 / 1 | 0.70 / 0.76 / 0.76 / 0.42 |
 | RoPE + PI, W=512 | 0 / 5 / 3 / 1 | 0.25 / 0.19 / 0.31 / 0.16 |
