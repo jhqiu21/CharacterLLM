@@ -1,0 +1,9 @@
+Short-range attention, seed 42, 512 test windows, all queries of the window: head-mean distance profile per layer (layers 0 / 1 / 2 / 3), its peak over distances 0-16, its sum over d = 0-2, the mean 90%-mass span, and the largest per-head weight on the most recent space. Reference rows from results/v4.
+
+| Model | Peak distance (chars) | Profile summed over d = 0-2 | Effective span (chars) | Best word-boundary head |
+|---|---|---|---|---|
+| RoPE, W=128 | 1 / 1 / 1 / 1 | 0.70 / 0.76 / 0.76 / 0.42 | 9.8 / 3.2 / 5.1 / 24.4 | 0.330 |
+| RoPE + PI, W=512 | 0 / 5 / 3 / 1 | 0.25 / 0.19 / 0.31 / 0.16 | 43.2 / 10.2 / 13.6 / 114.3 | 0.339 |
+| RoPE, W=512 | 1 / 1 / 1 / 1 | 0.22 / 0.24 / 0.26 / 0.15 | 186.1 / 164.6 / 164.1 / 195.1 | 0.113 |
+| RoPE + PI + 512-window fine-tuning, W=512 | 1 / 1 / 1 / 1 | 0.72 / 0.81 / 0.77 / 0.38 | 34.6 / 3.7 / 5.8 / 74.4 | 0.323 |
+| RoPE + 512-window fine-tuning, W=512 | 1 / 1 / 1 / 1 | 0.66 / 0.74 / 0.73 / 0.37 | 32.5 / 6.9 / 15.8 / 90.5 | 0.327 |
