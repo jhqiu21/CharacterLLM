@@ -127,3 +127,37 @@ def test_load_data_without_test_returns_none(tiny_run):
     _, data_dir, _ = tiny_run
     train_int, val_int, test_int = train.load_data(data_dir, include_test=False)
     assert test_int is None and len(train_int) == 5700 and len(val_int) == 300
+
+
+def test_init_from_starts_from_the_source_checkpoint(tiny_run):
+    """--init-from loads the source run's best-loss parameters; with learning rate 0 they stay exactly unchanged."""
+    from utils import load_checkpoint
+
+    tmp_path, data_dir, cfg_path = tiny_run
+    common = ["--config", str(cfg_path), "--seed", "3", "--tuning", "--data-dir", str(data_dir),
+              "--set", "evaluation.tuning_val_stride=4"]
+    train.main(common + ["--run-name", "src"])
+    train.main(common + ["--run-name", "ft", "--init-from", "src", "--set", "training.learning_rate=0.0",
+                         "--set", "model.max_len=32", "--set", "training.sequence_length=32", "--set", "model.pos_scale=0.5"])
+
+    def best(run):
+        d = tmp_path / "ckpt" / run
+        return load_checkpoint("best_loss_all_", "Best Loss", d / "best", d / "stage")
+
+    src, ft = best("src"), best("ft")
+    jax_tree = __import__("jax").tree_util
+    for a, b in zip(jax_tree.tree_leaves(src["params"]), jax_tree.tree_leaves(ft["params"])):
+        np.testing.assert_array_equal(np.asarray(a), np.asarray(b))
+    saved = yaml.safe_load(open(tmp_path / "runs" / "ft" / "config.yaml"))
+    assert saved["run"]["init_from"] == "src" and saved["run"]["init_from_step"] == src["step"]
+    assert saved["model"]["pos_scale"] == 0.5 and saved["model"]["max_len"] == 32
+    assert json.load(open(tmp_path / "runs" / "ft" / "val_eval.json"))["init_from"] == "src"
+
+
+def test_init_from_rejects_other_shapes(tiny_run):
+    tmp_path, data_dir, cfg_path = tiny_run
+    common = ["--config", str(cfg_path), "--seed", "3", "--tuning", "--data-dir", str(data_dir),
+              "--set", "evaluation.tuning_val_stride=4"]
+    train.main(common + ["--run-name", "src"])
+    with pytest.raises(ValueError, match="parameter shapes"):
+        train.main(common + ["--run-name", "ft", "--init-from", "src", "--set", "model.d_model=32"])

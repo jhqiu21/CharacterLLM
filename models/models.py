@@ -13,14 +13,16 @@ import jax
 import jax.numpy as jnp
 from flax.linen import attention as attn
 from .positional_encodings import (
+    SELF_EXTEND_MODES,
     SinusoidalPositionalEncoding,
     RotaryPositionalEmbedding,
     ALiBiPositionalBias,
     HybridPositionalEncoding,
-    RelativePositionalEncoding
+    RelativePositionalEncoding,
+    self_extend_positions,
 )
 
-POS_SCALE_TYPES = ("rope", "sinusoidal")  # encodings that support evaluation-time position interpolation
+POS_SCALE_TYPES = ("rope", "sinusoidal")  # encodings that support position interpolation (pos_scale)
 
 
 class MLP(nn.Module):
@@ -72,6 +74,9 @@ class MultiHeadAttentionWithPE(nn.Module):
       longer than rel_table_len. Offsets inside the table are untouched, so for T <= rel_table_len the
       output is identical with or without the clamp.
     - pos_scale: 'rope' only here; rotation angles use position p * pos_scale (position interpolation).
+    - self_extend_window / self_extend_group / self_extend_mode: 'rope' only; pairs with distance
+      i - j < self_extend_window keep their exact positions, farther pairs use the compressed positions of
+      positional_encodings.self_extend_positions (SelfExtend 'floor' or continuous 'linear'). 0 = off.
     """
 
     d_model: int
@@ -83,6 +88,9 @@ class MultiHeadAttentionWithPE(nn.Module):
     rel_table_len: int = 0
     rel_clamp: bool = False
     pos_scale: float = 1.0
+    self_extend_window: int = 0
+    self_extend_group: float = 1.0
+    self_extend_mode: str = "floor"
 
     def setup(self):
         self.head_dim = self.d_model // self.n_heads
@@ -135,8 +143,11 @@ class MultiHeadAttentionWithPE(nn.Module):
         k = k.reshape(B, T, self.n_heads, self.head_dim)
         v = v.reshape(B, T, self.n_heads, self.head_dim)
 
-        # Apply RoPE if specified
+        # Apply RoPE if specified (SelfExtend: also the far-band rotation of the unrotated q, k)
         if self.pos_encoding_type == 'rope':
+            if self.self_extend_window:
+                q_pos, k_pos = self_extend_positions(T, self.self_extend_window, self.self_extend_group, self.self_extend_mode)
+                q_far, k_far = self.rope.rotate_at(q, k, q_pos, k_pos)
             q, k = self.rope(q, k)
 
         # Transpose to (B, H, T, d) for attention computation
@@ -147,6 +158,10 @@ class MultiHeadAttentionWithPE(nn.Module):
         # Compute attention scores: (B, H, T, T)
         scale = 1.0 / jnp.sqrt(self.head_dim)
         attn_scores = jnp.einsum('bhqd,bhkd->bhqk', q, k) * scale
+        if self.self_extend_window:
+            far_scores = jnp.einsum('bqhd,bkhd->bhqk', q_far, k_far) * scale
+            pos = jnp.arange(T)
+            attn_scores = jnp.where((pos[:, None] - pos[None, :]) < self.self_extend_window, attn_scores, far_scores)
 
         # Add positional biases if using ALiBi or Relative
         if self.pos_encoding_type == 'alibi':
@@ -208,7 +223,7 @@ class DecoderBlock(nn.Module):
         attention output.
       mlp_ratio: MLP expansion factor.
       pos_encoding_type, max_len: passed to MultiHeadAttentionWithPE.
-      capture_attn, rel_table_len, rel_clamp, pos_scale: evaluation-only options of MultiHeadAttentionWithPE.
+      capture_attn, rel_table_len, rel_clamp, pos_scale, self_extend_*: options of MultiHeadAttentionWithPE.
 
     Input/Output shape: (B, T, D)
     """
@@ -225,6 +240,9 @@ class DecoderBlock(nn.Module):
     rel_table_len: int = 0
     rel_clamp: bool = False
     pos_scale: float = 1.0
+    self_extend_window: int = 0
+    self_extend_group: float = 1.0
+    self_extend_mode: str = "floor"
 
     @nn.compact
     def __call__(self, x, *, mask=None, deterministic: bool):
@@ -242,6 +260,9 @@ class DecoderBlock(nn.Module):
             rel_table_len=self.rel_table_len,
             rel_clamp=self.rel_clamp,
             pos_scale=self.pos_scale,
+            self_extend_window=self.self_extend_window,
+            self_extend_group=self.self_extend_group,
+            self_extend_mode=self.self_extend_mode,
         )(h, mask=mask, deterministic=deterministic)
 
         h = nn.Dropout(rate=self.resid_dropout)(h, deterministic=deterministic)
@@ -279,8 +300,13 @@ class DecoderOnlyTransformer(nn.Module):
       max_len: Maximum supported sequence length for positional embeddings.
       sinusoidal_scale: 'unit' (rows of the sinusoidal table have norm 1) or 'raw' (norm sqrt(D/2));
         used by 'sinusoidal' and the sinusoidal half of 'hybrid'.
-      pos_scale: evaluation-only position interpolation for 'rope' and 'sinusoidal': position p is replaced
-        by p * pos_scale (e.g. 128 / W maps a window of W onto the trained range). 1.0 = unchanged.
+      pos_scale: position interpolation for 'rope' and 'sinusoidal': position p is replaced by p * pos_scale
+        (e.g. 128 / W maps a window of W onto the trained range). 1.0 = unchanged. Set at evaluation time by the
+        extrapolation tools, or in training through model.pos_scale (PI fine-tuning, train.py --init-from).
+      attn_window: evaluation-only local attention; query i sees only keys j with i - j < attn_window (0 = full
+        causal attention). Applies to every encoding.
+      self_extend_window, self_extend_group, self_extend_mode: evaluation-only SelfExtend for 'rope' (see
+        MultiHeadAttentionWithPE); 0 = off.
     """
 
     vocab_size: int
@@ -301,11 +327,21 @@ class DecoderOnlyTransformer(nn.Module):
     rel_table_len: int = 0
     rel_clamp: bool = False
     pos_scale: float = 1.0
+    attn_window: int = 0
+    self_extend_window: int = 0
+    self_extend_group: float = 1.0
+    self_extend_mode: str = "floor"
 
     def setup(self):
         if self.pos_scale != 1.0 and self.pos_encoding_type not in POS_SCALE_TYPES:
             raise ValueError(f"pos_scale (position interpolation) applies to {POS_SCALE_TYPES} only, "
                              f"not to pos_encoding_type {self.pos_encoding_type!r}")
+        if self.self_extend_window:
+            if self.pos_encoding_type != "rope" or self.pos_scale != 1.0:
+                raise ValueError("self_extend applies to 'rope' with pos_scale 1.0 only, not to "
+                                 f"{self.pos_encoding_type!r} with pos_scale {self.pos_scale}")
+            if self.self_extend_mode not in SELF_EXTEND_MODES:
+                raise ValueError(f"self_extend_mode must be one of {SELF_EXTEND_MODES}, got {self.self_extend_mode!r}")
         # Token embedding table E with shape (V, D)
         self.tok_embed = nn.Embed(self.vocab_size, self.d_model)
 
@@ -352,6 +388,9 @@ class DecoderOnlyTransformer(nn.Module):
                   rel_table_len=self.rel_table_len,
                   rel_clamp=self.rel_clamp,
                   pos_scale=self.pos_scale,
+                  self_extend_window=self.self_extend_window,
+                  self_extend_group=self.self_extend_group,
+                  self_extend_mode=self.self_extend_mode,
             ) for _ in range(self.n_layers)
         ]
 
@@ -389,6 +428,9 @@ class DecoderOnlyTransformer(nn.Module):
         # Build attention mask: strictly causal (lower-triangular), no padding mask.
         causal = attn.make_causal_mask(jnp.ones((B, T), dtype=bool))
         mask = causal
+        if self.attn_window:  # local attention: only the last attn_window positions (the query included)
+            pos = jnp.arange(T)
+            mask = jnp.logical_and(mask, ((pos[:, None] - pos[None, :]) < self.attn_window)[None, None])
 
         # Run the stack of decoder blocks
         for blk in self.blocks:

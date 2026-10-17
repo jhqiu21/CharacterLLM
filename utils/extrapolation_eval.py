@@ -9,7 +9,13 @@ The model is rebuilt with max_len = W and the trained parameters are loaded unch
 - LSTM: runs on any length (no positional encoding).
 
 Position interpolation (interpolate=True, 'rope' and 'sinusoidal' only, no fine-tuning): positions p are replaced by
-p * L / W (DecoderOnlyTransformer.pos_scale), so a window of W characters maps onto the trained range [0, L).
+p * s * L / W (DecoderOnlyTransformer.pos_scale; s = model.pos_scale, 1.0 unless the run was trained with PI), so a
+window of W characters maps onto the trained range.
+Further evaluation-only variants (no fine-tuning):
+- attn_window: local attention, every layer sees only the last attn_window positions;
+- self_extend=(window, mode), 'rope' only: distances below `window` keep their exact positions, farther ones are
+  compressed by the group size of self_extend_group (SelfExtend 'floor' or continuous 'linear'), chosen per W so that
+  every relative position stays below L.
 
 Two metrics per (run, W):
 1. sliding_window_eval: full_context_eval with window W and stride S (default 128): every target after the first
@@ -49,15 +55,37 @@ def length_config(config, window):
 
 
 def interpolation_scale(config, window):
-    """pos_scale that maps a window of `window` positions onto the training range: L / W (1.0 at W = L)."""
-    return train_len(config) / int(window)
+    """pos_scale that maps a window of `window` positions onto the training range: s * L / W, with s the run's own
+    model.pos_scale (1.0 unless trained with PI), so s at W = L."""
+    return float(getattr(config.model, "pos_scale", 1.0)) * train_len(config) / int(window)
 
 
-def rebuild_for_length(config, window, build_model, capture_attn=False, interpolate=False):
+def self_extend_group(L, window, near, mode):
+    """Smallest group size for SelfExtend at window W = `window` such that the far band's largest relative position
+    stays at most L - 1 (the largest trained distance). 'floor': an integer; 'linear': exactly (W-1-near)/(L-1-near).
+    1 when W <= L (the model is then unchanged)."""
+    W = int(window)
+    if not 0 < near < L - 1:
+        raise ValueError(f"self-extend window must be in (0, {L - 1}), got {near}")
+    if W <= L:
+        return 1
+    if mode == "linear":
+        return (W - 1 - near) / (L - 1 - near)
+    if mode == "floor":
+        g = 1
+        while (W - 1) // g + near - near // g > L - 1:
+            g += 1
+        return g
+    raise ValueError(f"unknown self-extend mode {mode!r}")
+
+
+def rebuild_for_length(config, window, build_model, capture_attn=False, interpolate=False, attn_window=0, self_extend=None):
     """Model for windows of length `window` that loads the parameters trained under `config`.
 
     build_model is train.build_model (passed in to keep utils free of a train.py import).
-    interpolate: position interpolation with pos_scale = L / window ('rope' and 'sinusoidal' only).
+    interpolate: position interpolation with pos_scale = s * L / window ('rope' and 'sinusoidal' only).
+    attn_window: local attention over the last attn_window positions (0 = full causal attention).
+    self_extend: (near window, 'floor' | 'linear') for 'rope'; the group size comes from self_extend_group.
     """
     L = train_len(config)
     m = config.model
@@ -76,6 +104,15 @@ def rebuild_for_length(config, window, build_model, capture_attn=False, interpol
         opts.update(rel_table_len=L, rel_clamp=True)
     if interpolate and window != L:
         opts["pos_scale"] = interpolation_scale(config, window)
+    if attn_window:
+        opts["attn_window"] = int(attn_window)
+    if self_extend:
+        near, mode = self_extend
+        if pe != "rope" or interpolate:
+            raise ValueError(f"self-extend applies to 'rope' without interpolation, not to {pe!r} (interpolate={interpolate})")
+        group = self_extend_group(L, window, int(near), mode)
+        if group != 1:  # group 1 (W <= L): the far band equals the near band, i.e. the plain model
+            opts.update(self_extend_window=int(near), self_extend_group=group, self_extend_mode=mode)
     return build_model(length_config(config, window), **opts)
 
 

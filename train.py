@@ -2,7 +2,7 @@
 Canonical training + evaluation entry point (transformer.ipynb is an interactive front end built on these functions).
 
     python train.py --config configs/final/TR.yaml --seed 42 [--run-name NAME] [--legacy-dropout-rng]
-                    [--set section.key=value ...] [--tuning] [--data-dir DIR]
+                    [--set section.key=value ...] [--tuning] [--data-dir DIR] [--init-from RUN]
                     [--epochs N] [--val-interval N] [--fc-stride S] [--eval-only]
 
 --set overrides a dotted config key (repeatable; values parsed as int, float, bool or string; unknown keys
@@ -10,6 +10,8 @@ are an error); overrides are recorded under run.overrides in the run's config.ya
 --tuning never opens the test file: checkpoints are selected on the fixed validation set as usual, and the
 best-loss checkpoint is then scored with full-context evaluation on the validation split
 (stride evaluation.tuning_val_stride) into val_eval.json; no test metrics, samples or Self-BLEU.
+--init-from RUN starts from the parameters of RUN's best_loss_all_ checkpoint instead of a fresh initialisation
+(fine-tuning; the optimizer state and the LR schedule start fresh); the model must have the same parameter shapes.
 --epochs / --val-interval / --fc-stride are for smoke tests only. --eval-only re-runs the final
 evaluation from the checkpoints of an existing run. GPU selection comes from CUDA_VISIBLE_DEVICES.
 
@@ -27,8 +29,9 @@ Intentional differences from the original course notebook (results/code_changes_
   * generation places the prompt at the start of the window (no left padding);
   * test evaluation in three modes (legacy32, chunked128, full_context), written to eval.json, plus
     single-prompt and multi-prompt Self-BLEU.
-Additions not in the notebook: pos_encoding_type 'none' (NoPE) and the evaluation-only model options used by
-utils/extrapolation_eval.py and scripts/analyze_attention.py (capture_attn, rel_clamp, pos_scale).
+Additions not in the notebook: pos_encoding_type 'none' (NoPE), the evaluation-only model options used by
+utils/extrapolation_eval.py and scripts/analyze_attention.py (capture_attn, rel_clamp, pos_scale, attn_window,
+self_extend_*), model.pos_scale (position interpolation in training, default 1.0) and --init-from (fine-tuning).
 """
 
 import argparse
@@ -75,6 +78,8 @@ INT_TO_CHAR = {i: ch for ch, i in CHAR_TO_INT.items()}
 TRAIN_RATIO = 0.95
 VAL_SET_SIZE = 1024
 VAL_SET_SEED = 0
+# windows x T^2 per validation forward pass: the 1024 x 128 set in one pass, longer windows in chunks (apply_chunked)
+VAL_ATTN_BUDGET = VAL_SET_SIZE * 128 * 128
 TIMING_WINDOW = (1000, 2000)
 
 # Evaluated checkpoints: (on-disk prefix, name, run every evaluation mode?)
@@ -101,7 +106,9 @@ DEFAULTS = {
 }
 # Per model.type defaults (only added for that type).
 MODEL_DEFAULTS = {
-    "transformer": {"sinusoidal_scale": "unit"},  # 'unit': sinusoidal rows have norm 1; 'raw': norm sqrt(d_model/2)
+    # sinusoidal_scale 'unit': sinusoidal rows have norm 1; 'raw': norm sqrt(d_model/2).
+    # pos_scale: position interpolation p -> p * pos_scale ('rope' / 'sinusoidal'; 1.0 = off), e.g. PI fine-tuning.
+    "transformer": {"sinusoidal_scale": "unit", "pos_scale": 1.0},
     "lstm": {"forget_bias": 1.0},                 # initial forget-gate bias; 0.0 = original all-zero bias
 }
 SELF_BLEU_PROMPT_SEED = 0
@@ -215,11 +222,13 @@ def apply_overrides(d, assignments):
 
 def build_model(config, **eval_options):
     """eval_options: evaluation-only keyword arguments of DecoderOnlyTransformer (capture_attn, rel_table_len,
-    rel_clamp, pos_scale); the defaults build the training model."""
+    rel_clamp, pos_scale, attn_window, self_extend_*); the defaults build the training model. pos_scale defaults to
+    model.pos_scale."""
     m = config.model
     if eval_options and m.type != "transformer":
         raise ValueError(f"eval_options {sorted(eval_options)} apply to transformers only")
     if m.type == "transformer":
+        eval_options = {"pos_scale": float(getattr(m, "pos_scale", MODEL_DEFAULTS["transformer"]["pos_scale"])), **eval_options}
         return transformer_models.DecoderOnlyTransformer(
             vocab_size=m.vocab_size,
             d_model=m.d_model,
@@ -446,6 +455,15 @@ def make_apply_fn(model):
     return jax.jit(lambda params, x: model.apply({"params": params}, x, deterministic=True))
 
 
+def apply_chunked(apply_fn, params, x, budget=VAL_ATTN_BUDGET):
+    """apply_fn(params, x) in chunks of at most budget // T^2 windows: one pass for the 1024 x 128 validation set (as
+    before), chunks for longer windows (the attention scores of 1024 x 512 windows do not fit on a 24 GB card)."""
+    n = max(1, budget // x.shape[1] ** 2)
+    if n >= x.shape[0]:
+        return apply_fn(params, x)
+    return jnp.concatenate([apply_fn(params, x[i:i + n]) for i in range(0, x.shape[0], n)])
+
+
 # ----------------------------------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------------------------------
@@ -503,7 +521,17 @@ def run_paths(config, run_name):
 # ----------------------------------------------------------------------------------------------
 # Training
 # ----------------------------------------------------------------------------------------------
-def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, best_dir):
+def load_init_params(config, run_name):
+    """(params, step) of the best_loss_all_ checkpoint of `run_name` (--init-from)."""
+    _, stage_dir, best_dir = run_paths(config, run_name)
+    ckpt = load_checkpoint("best_loss_all_", "Best Loss", best_dir, stage_dir)
+    if ckpt is None:
+        raise FileNotFoundError(f"--init-from {run_name}: no best_loss_all_ checkpoint in {best_dir}")
+    return ckpt["params"], int(ckpt["step"])
+
+
+def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, best_dir, initial_params=None):
+    """initial_params: parameters to start from (--init-from fine-tuning); default: fresh initialisation from `seed`."""
     train_int, val_int, _ = data
     B = config.training.batch_size
     T = config.training.sequence_length
@@ -514,6 +542,12 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
     np_rng = np.random.default_rng(seed)
 
     params = init_params(model, config, init_key)
+    if initial_params is not None:
+        shapes = jax.tree_util.tree_map(np.shape, params)
+        if jax.tree_util.tree_map(np.shape, initial_params) != shapes:
+            raise ValueError("--init-from: the checkpoint's parameter shapes differ from this model's")
+        params = jax.tree_util.tree_map(jnp.asarray, initial_params)
+        print(f"Parameters initialised from run {config.run.init_from} (step {config.run.init_from_step})")
     print(f"Model created: {config.model_name} ({config.model.type}), parameters: {count_params(params):_}")
 
     loss_and_metrics = make_loss_and_metrics(config)  # training step and validation: full metric set
@@ -547,7 +581,7 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
 
         if it % val_interval == 0 or it == epochs - 1:
             time_since_start = time.time() - time_start
-            val_logits = apply_fn(params, val_x)
+            val_logits = apply_chunked(apply_fn, params, val_x)
             _, val_metrics = loss_and_metrics(val_logits, val_y)
             val_metrics = jax.device_get(val_metrics)
 
@@ -843,6 +877,8 @@ def parse_args(argv=None):
     p.add_argument("--tuning", action="store_true",
                    help="hyperparameter-search mode: never open the test file; write val_eval.json instead of eval.json")
     p.add_argument("--data-dir", default=str(REPO_ROOT / "data"), help="directory with text8_train.txt / text8_test.txt")
+    p.add_argument("--init-from", default=None, metavar="RUN",
+                   help="fine-tune: start from the best_loss_all_ checkpoint of RUN (fresh optimizer state and schedule)")
     return p.parse_args(argv)
 
 
@@ -878,6 +914,7 @@ def main(argv=None):
         "config_file": str(args.config),
         "overrides": overrides,
         "git_commit": git_commit(),
+        "init_from": args.init_from,
     }
     config = Config(d)
     run_dir, stage_dir, best_dir = run_paths(config, run_name)
@@ -908,6 +945,9 @@ def run(args, config, run_name, run_dir, stage_dir, best_dir):
     tuning = bool(args.tuning)
     print(f"Run {run_name}: config {args.config}, seed {config.run.seed}, devices {jax.devices()}, "
           f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}, eval_only={args.eval_only}, tuning={tuning}")
+    initial_params = None
+    if not args.eval_only and getattr(config.run, "init_from", None):
+        initial_params, config.run.init_from_step = load_init_params(config, config.run.init_from)
     if not args.eval_only:
         save_config(config, run_dir / "config.yaml")
     print(json.dumps(config.to_dict(), indent=2))
@@ -918,7 +958,8 @@ def run(args, config, run_name, run_dir, stage_dir, best_dir):
     model = build_model(config)
 
     if not args.eval_only:
-        train(config, model, data, config.run.seed, config.run.legacy_dropout_rng, run_dir, stage_dir, best_dir)
+        train(config, model, data, config.run.seed, config.run.legacy_dropout_rng, run_dir, stage_dir, best_dir,
+              initial_params=initial_params)
 
     num_params = count_params(init_params(model, config, jax.random.PRNGKey(0)))
     meta = {
@@ -934,6 +975,7 @@ def run(args, config, run_name, run_dir, stage_dir, best_dir):
         "overrides": config.run.overrides.to_dict() if isinstance(config.run.overrides, Config) else config.run.overrides,
         "git_commit": config.run.git_commit,
         "eval_git_commit": getattr(config.run, "eval_git_commit", config.run.git_commit),
+        "init_from": getattr(config.run, "init_from", None),
         "device": jax.devices()[0].device_kind,
     }
     if tuning:

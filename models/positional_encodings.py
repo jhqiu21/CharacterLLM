@@ -74,6 +74,38 @@ def precompute_freqs_cis(dim: int, max_len: int, theta: float = 10000.0, pos_sca
     return freqs_cis
 
 
+def rope_freqs_at(dim: int, positions, theta: float = 10000.0):
+    """Rotation factors exp(i * p * freq) at arbitrary (possibly fractional) positions p, shape (len(p), dim//2)."""
+    freqs = 1.0 / (theta ** (jnp.arange(0, dim, 2)[: (dim // 2)] / dim))
+    return jnp.exp(1j * jnp.outer(positions, freqs))
+
+
+SELF_EXTEND_MODES = ("floor", "linear")
+
+
+def self_extend_positions(seq_len: int, window: int, group: float, mode: str):
+    """(query positions, key positions) of the far band of SelfExtend-style attention (evaluation only).
+
+    Pairs with distance i - j < window keep their exact RoPE positions (the near band); the far band rotates query i
+    and key j by these positions instead, so its relative position is q_pos[i] - k_pos[j]:
+    - 'floor': SelfExtend (Jin et al., 2024) grouped attention, floor(i/G) + window - floor(window/G) and floor(j/G);
+    - 'linear': continuous compression (as in leaky ReRoPE), i/G + window - window/G and j/G, so the relative position
+      is window + (i - j - window) / G.
+    Both shifts make the far band start near distance `window`; group 1 gives the exact positions back.
+    """
+    p = jnp.arange(seq_len)
+    if mode == "floor":
+        g = int(group)
+        if g != group or g < 1:
+            raise ValueError(f"'floor' needs an integer group >= 1, got {group}")
+        return p // g + (window - window // g), p // g
+    if mode == "linear":
+        if group < 1:
+            raise ValueError(f"'linear' needs group >= 1, got {group}")
+        return p / group + (window - window / group), p / group
+    raise ValueError(f"self-extend mode must be one of {SELF_EXTEND_MODES}, got {mode!r}")
+
+
 def apply_rotary_emb(x, freqs_cis):
     # Reshape x to treat pairs of dimensions as complex numbers
     x_complex = jax.lax.complex(x[..., ::2], x[..., 1::2])  # (B, T, n_heads, head_dim//2)
@@ -106,6 +138,11 @@ class RotaryPositionalEmbedding(nn.Module):
         q_rotated = apply_rotary_emb(q, self.freqs_cis)
         k_rotated = apply_rotary_emb(k, self.freqs_cis)
         return q_rotated, k_rotated
+
+    def rotate_at(self, q, k, q_pos, k_pos):
+        """RoPE with separate (possibly fractional) positions for queries and keys (the SelfExtend far band)."""
+        return (apply_rotary_emb(q, rope_freqs_at(self.head_dim, q_pos, self.theta)),
+                apply_rotary_emb(k, rope_freqs_at(self.head_dim, k_pos, self.theta)))
 
 
 """ALiBi Positional Encodings"""
