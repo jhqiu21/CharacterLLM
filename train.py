@@ -12,6 +12,9 @@ best-loss checkpoint is then scored with full-context evaluation on the validati
 (stride evaluation.tuning_val_stride) into val_eval.json; no test metrics, samples or Self-BLEU.
 --init-from RUN starts from the parameters of RUN's best_loss_all_ checkpoint instead of a fresh initialisation
 (fine-tuning; the optimizer state and the LR schedule start fresh); the model must have the same parameter shapes.
+training.checkpoint_selection picks the checkpoint that --tuning and the full test evaluation score: 'loss' (default,
+best_loss_all_: lowest fixed-validation loss) or 'acc' (best_acc_bpc_: highest fixed-validation accuracy, ties broken
+by the lower loss, i.e. the lower BPC; saved only in this mode).
 --epochs / --val-interval / --fc-stride are for smoke tests only. --eval-only re-runs the final
 evaluation from the checkpoints of an existing run. GPU selection comes from CUDA_VISIBLE_DEVICES.
 
@@ -31,7 +34,8 @@ Intentional differences from the original course notebook (results/code_changes_
     single-prompt and multi-prompt Self-BLEU.
 Additions not in the notebook: pos_encoding_type 'none' (NoPE), the evaluation-only model options used by
 utils/extrapolation_eval.py and scripts/analyze_attention.py (capture_attn, rel_clamp, pos_scale, attn_window,
-self_extend_*), model.pos_scale (position interpolation in training, default 1.0) and --init-from (fine-tuning).
+self_extend_*), model.pos_scale (position interpolation in training, default 1.0), --init-from (fine-tuning) and
+training.checkpoint_selection (selection by validation accuracy).
 """
 
 import argparse
@@ -82,15 +86,19 @@ VAL_SET_SEED = 0
 VAL_ATTN_BUDGET = VAL_SET_SIZE * 128 * 128
 TIMING_WINDOW = (1000, 2000)
 
-# Evaluated checkpoints: (on-disk prefix, name, run every evaluation mode?)
+# Evaluated checkpoints: (on-disk prefix, name); every evaluation mode runs on the selected one (selected_checkpoint)
 CHECKPOINT_TYPES = [
-    ("best_loss_all_", "Best Loss", True),
-    ("best_acc_total_", "Best Accuracy", False),
-    ("best_acc_last_", "Best Last-Char Accuracy", False),
+    ("best_loss_all_", "Best Loss"),
+    ("best_acc_total_", "Best Accuracy"),
+    ("best_acc_last_", "Best Last-Char Accuracy"),
+    ("best_acc_bpc_", "Best Accuracy (BPC tie-break)"),  # saved only with training.checkpoint_selection = acc
 ]
+# training.checkpoint_selection -> the checkpoint that --tuning and the full test evaluation score
+CHECKPOINT_SELECTIONS = {"loss": CHECKPOINT_TYPES[0], "acc": CHECKPOINT_TYPES[3]}
 
 DEFAULTS = {
     "model": {"type": "transformer"},
+    "training": {"checkpoint_selection": "loss"},
     # Values previously hard-coded in the notebook, plus the decay mask switch.
     "optimizer": {"b1": 0.9, "b2": 0.95, "eps": 1e-8, "weight_decay": 0.1, "grad_clip_norm": 1.0, "decay_mask": True},
     "evaluation": {
@@ -254,6 +262,15 @@ def build_model(config, **eval_options):
             forget_bias=float(getattr(m, "forget_bias", MODEL_DEFAULTS["lstm"]["forget_bias"])),
         )
     raise ValueError(f"Unknown model.type: {m.type}")
+
+
+def selected_checkpoint(config):
+    """(prefix, name) of the checkpoint chosen by training.checkpoint_selection: 'loss' = lowest fixed-validation loss,
+    'acc' = highest fixed-validation accuracy, ties broken by the lower loss."""
+    selection = getattr(config.training, "checkpoint_selection", DEFAULTS["training"]["checkpoint_selection"])
+    if selection not in CHECKPOINT_SELECTIONS:
+        raise ValueError(f"training.checkpoint_selection must be one of {sorted(CHECKPOINT_SELECTIONS)}, got {selection!r}")
+    return CHECKPOINT_SELECTIONS[selection]
 
 
 def init_params(model, config, key):
@@ -537,6 +554,7 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
     T = config.training.sequence_length
     epochs = config.training.epochs
     val_interval = config.training.validation_interval
+    select_acc = selected_checkpoint(config)[0] == "best_acc_bpc_"
 
     init_key, dropout_key = jax.random.split(jax.random.PRNGKey(seed))
     np_rng = np.random.default_rng(seed)
@@ -615,6 +633,9 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
             if is_best_acc_last:
                 checkpoints_to_save["best_acc_last"] = (it, checkpoint_state.copy())
                 print(f"\t \t Saving best last-character accuracy checkpoint at iteration {it}...")
+            if select_acc and metrics_logger.last_is_best_acc_bpc():
+                checkpoints_to_save["best_acc_bpc"] = (it, checkpoint_state.copy())
+                print(f"\t \t Saving best accuracy (BPC tie-break) checkpoint at iteration {it}...")
 
     total_time = time.time() - time_start
 
@@ -650,6 +671,8 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
         "total_train_time_s": float(total_time),
         "batch_size": B,
         "sequence_length": T,
+        "updates": int(epochs),
+        "train_tokens": int(epochs) * B * T,
         "device": jax.devices()[0].device_kind,
         "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "peak_device_memory_gib_training": peak_memory_gib(),
@@ -769,8 +792,10 @@ def evaluate(config, model, data, run_dir, stage_dir, best_dir, meta):
     timing_path = run_dir / "timing.json"
     results["throughput"] = json.load(open(timing_path)) if timing_path.exists() else None
     results["checkpoints"] = {}
+    results["selected_checkpoint"], _ = selected_checkpoint(config)
 
-    for prefix, name, full in CHECKPOINT_TYPES:
+    for prefix, name in CHECKPOINT_TYPES:
+        full = prefix == results["selected_checkpoint"]
         print(f"\n{name} ({prefix})...")
         checkpoint = load_checkpoint(prefix, name, best_dir, stage_dir)
         if checkpoint is None:
@@ -821,8 +846,9 @@ def evaluate(config, model, data, run_dir, stage_dir, best_dir, meta):
 
 
 def evaluate_tuning(config, model, data, run_dir, stage_dir, best_dir, meta):
-    """--tuning: score the best-loss checkpoint with full-context evaluation on the validation split.
-    Never touches the test split (data[2] is None) and writes no samples or Self-BLEU."""
+    """--tuning: score the selected checkpoint (and the best-loss one, if that is a different checkpoint type) with
+    full-context evaluation on the validation split. Never touches the test split (data[2] is None) and writes no
+    samples or Self-BLEU."""
     train_int, val_int, test_int = data
     assert test_int is None, "tuning mode must not load the test split"
     groups = frequency_groups(train_int, config.model.vocab_size, INT_TO_CHAR)
@@ -832,26 +858,29 @@ def evaluate_tuning(config, model, data, run_dir, stage_dir, best_dir, meta):
     timing_path = run_dir / "timing.json"
     results["throughput"] = json.load(open(timing_path)) if timing_path.exists() else None
 
-    prefix, name, _ = CHECKPOINT_TYPES[0]
-    checkpoint = load_checkpoint(prefix, name, best_dir, stage_dir)
-    if checkpoint is None:
-        raise FileNotFoundError(f"no {prefix} checkpoint in {best_dir}")
-    entry = {k: to_jsonable(checkpoint[k]) for k in
-             ("step", "val_loss", "val_bpc", "val_perplexity", "val_acc", "val_acc_last", "ECE")}
-    fc = full_context_eval(
-        model, checkpoint["params"], val_int,
-        window=config.model.max_len,
-        stride=config.evaluation.tuning_val_stride,
-        batch_size=config.evaluation.full_context_batch_size,
-        vocab_size=config.model.vocab_size,
-        rare_ids=groups["rare_ids"],
-        common_ids=groups["common_ids"],
-    )
-    assert fc["n_scored"] == len(val_int) - 1, (fc["n_scored"], len(val_int) - 1)
-    entry["full_context"] = fc
-    print(f"\t validation full_context (W={fc['window']}, S={fc['stride']}, {fc['seconds']:.0f}s): BPC {fc['bpc']:.4f}, "
-          f"acc {100 * fc['acc']:.2f}%, ECE {fc['ece']:.4f}")
-    results["checkpoints"] = {prefix: entry}
+    selected = selected_checkpoint(config)
+    results["selected_checkpoint"] = selected[0]
+    results["checkpoints"] = {}
+    for prefix, name in dict([selected, CHECKPOINT_TYPES[0]]).items():
+        checkpoint = load_checkpoint(prefix, name, best_dir, stage_dir)
+        if checkpoint is None:
+            raise FileNotFoundError(f"no {prefix} checkpoint in {best_dir}")
+        entry = {k: to_jsonable(checkpoint[k]) for k in
+                 ("step", "val_loss", "val_bpc", "val_perplexity", "val_acc", "val_acc_last", "ECE")}
+        fc = full_context_eval(
+            model, checkpoint["params"], val_int,
+            window=config.model.max_len,
+            stride=config.evaluation.tuning_val_stride,
+            batch_size=config.evaluation.full_context_batch_size,
+            vocab_size=config.model.vocab_size,
+            rare_ids=groups["rare_ids"],
+            common_ids=groups["common_ids"],
+        )
+        assert fc["n_scored"] == len(val_int) - 1, (fc["n_scored"], len(val_int) - 1)
+        entry["full_context"] = fc
+        print(f"\t {name} (step {entry['step']}): validation full_context (W={fc['window']}, S={fc['stride']}, "
+              f"{fc['seconds']:.0f}s): BPC {fc['bpc']:.4f}, acc {100 * fc['acc']:.2f}%, ECE {fc['ece']:.4f}")
+        results["checkpoints"][prefix] = entry
     results["peak_device_memory_gib"] = peak_memory_gib()
     with open(run_dir / "val_eval.json", "w") as f:
         json.dump(to_jsonable(results), f, indent=2)

@@ -216,10 +216,12 @@ def test_older_configs_get_pos_scale_one():
     ({"interpolate": True}, "extrapolation_pi.json"),
     ({"local_window": 64}, "extrapolation_local64.json"),
     ({"self_extend": 32, "self_extend_mode": "linear", "split": "val"}, "extrapolation_selinear32_val.json"),
+    ({"tag": "v6"}, "extrapolation_v6.json"),
+    ({"split": "val", "tag": "v6"}, "extrapolation_val_v6.json"),
 ])
 def test_output_names(kw, name):
     args = argparse.Namespace(**{"interpolate": False, "local_window": 0, "self_extend": 0, "self_extend_mode": "floor",
-                                 "split": "test", **kw})
+                                 "split": "test", "tag": "", **kw})
     assert output_name(args) == name
 
 

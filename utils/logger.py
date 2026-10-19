@@ -60,6 +60,12 @@ class Logger:
         is_best_acc_last = test_metrics['acc_last'] >= max(self.acc_last, default=float('-inf'))
         return is_best_loss_all, is_best_acc, is_best_acc_last
 
+    def last_is_best_acc_bpc(self):
+        # Is the newest logged evaluation the best by accuracy, ties broken by the lower loss (= lower BPC on
+        # the same set)? Call after log_eval. An exact tie with an earlier evaluation keeps the earlier one.
+        keys = [(acc, -loss) for acc, loss in zip(self.acc, self.loss_all_val)]
+        return all(keys[-1] > k for k in keys[:-1])
+
     def __repr__(self):
         n_train = len(self.loss_weighted_train)
         n_eval = len(self.iteration)

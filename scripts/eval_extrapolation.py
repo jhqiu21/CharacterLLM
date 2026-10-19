@@ -9,7 +9,9 @@ non-overlapping chunks (seed 0). learned / hybrid beyond their training length a
 --interpolate uses position interpolation (rope / sinusoidal only, no fine-tuning): pos_scale = L / W for each W,
 and writes runs/<run>/extrapolation_pi.json instead (the plain results are never overwritten).
 The evaluation batch size starts at --batch-size and is lowered for large W so the estimate stays below --budget-gib.
-Writes runs/<run>/extrapolation.json (checkpoint best_loss_all_).
+Writes runs/<run>/extrapolation.json for the run's selected checkpoint (train.selected_checkpoint: best_loss_all_
+unless the run was trained with training.checkpoint_selection=acc); --checkpoint PREFIX scores another one.
+--tag NAME appends _NAME to the output name, e.g. to re-evaluate a run without overwriting an earlier result.
 
     python scripts/eval_extrapolation.py --run TR-final_s42 --lengths 256 512 1024 --interpolate
 
@@ -51,18 +53,26 @@ from utils.full_context_eval import frequency_groups  # noqa: E402
 DROP = ("ece_bins", "class_count", "class_correct")
 
 
-def load_run(run):
-    run_dir = ROOT / "runs" / run
+def checkpoint_prefix(config, checkpoint=None):
+    """`checkpoint` (a prefix of train.CHECKPOINT_TYPES), or the run's selected checkpoint when None."""
+    return train.selected_checkpoint(config)[0] if checkpoint is None else checkpoint
+
+
+def load_run(run, checkpoint=None, runs_dir=ROOT / "runs"):
+    """(run_dir, config, checkpoint dict) of `run`; checkpoint: a prefix of train.CHECKPOINT_TYPES (default: the
+    run's selected checkpoint)."""
+    run_dir = Path(runs_dir) / run
     config = train.resolve_config(load_config(run_dir / "config.yaml"))
     _, stage_dir, best_dir = train.run_paths(config, run)
-    ckpt = load_checkpoint("best_loss_all_", "Best Loss", best_dir, stage_dir)
+    prefix = checkpoint_prefix(config, checkpoint)
+    ckpt = load_checkpoint(prefix, dict(train.CHECKPOINT_TYPES)[prefix], best_dir, stage_dir)
     if ckpt is None:
-        raise FileNotFoundError(f"no best_loss_all_ checkpoint for {run}")
+        raise FileNotFoundError(f"no {prefix} checkpoint for {run}")
     return run_dir, config, ckpt
 
 
 def output_name(args):
-    """extrapolation[_pi][_local<N>][_se<mode><N>][_val].json"""
+    """extrapolation[_pi][_local<N>][_se<mode><N>][_val][_<tag>].json"""
     parts = ["extrapolation"]
     if args.interpolate:
         parts.append("pi")
@@ -72,6 +82,8 @@ def output_name(args):
         parts.append(f"se{args.self_extend_mode}{args.self_extend}")
     if args.split == "val":
         parts.append("val")
+    if args.tag:
+        parts.append(args.tag)
     return "_".join(parts) + ".json"
 
 
@@ -90,12 +102,15 @@ def main(argv=None):
     ap.add_argument("--self-extend-mode", choices=["floor", "linear"], default="floor")
     ap.add_argument("--stride1", type=int, nargs="*", default=[], help="also sliding-window BPC with stride 1 at these W")
     ap.add_argument("--split", choices=["test", "val"], default="test", help="val: score the validation split (test never opened)")
+    ap.add_argument("--checkpoint", default=None, choices=[p for p, _ in train.CHECKPOINT_TYPES],
+                    help="checkpoint to score (default: the run's selected checkpoint)")
+    ap.add_argument("--tag", default="", help="suffix of the output file name")
     ap.add_argument("--data-dir", default=str(ROOT / "data"))
     args = ap.parse_args(argv)
     if args.sanity and args.split != "test":
         raise SystemExit("--sanity compares with eval.json, which is a test-set result: use --split test")
 
-    run_dir, config, ckpt = load_run(args.run)
+    run_dir, config, ckpt = load_run(args.run, args.checkpoint)
     out_file = run_dir / output_name(args)
     params = ckpt["params"]
     train_int, val_int, test_int = train.load_data(args.data_dir, include_test=args.split == "test")
@@ -105,7 +120,7 @@ def main(argv=None):
     self_extend = (args.self_extend, args.self_extend_mode) if args.self_extend else None
     variant = {"interpolate": bool(args.interpolate), "attn_window": args.local_window,
                "self_extend": list(self_extend) if self_extend else None}
-    out = {"run": args.run, "checkpoint": "best_loss_all_", "step": int(ckpt["step"]), "train_len": L,
+    out = {"run": args.run, "checkpoint": checkpoint_prefix(config, args.checkpoint), "step": int(ckpt["step"]), "train_len": L,
            "model_type": config.model.type, "pos_encoding_type": getattr(config.model, "pos_encoding_type", None),
            "model_pos_scale": float(getattr(config.model, "pos_scale", 1.0)), "split": args.split,
            "n_chars": len(eval_int), "stride": args.stride, "n_chunks": args.n_chunks, "device": jax.devices()[0].device_kind,
@@ -124,7 +139,7 @@ def main(argv=None):
         return {k: v for k, v in fc.items() if k not in DROP}
 
     if args.sanity:
-        ref = json.load(open(run_dir / "eval.json"))["checkpoints"]["best_loss_all_"]["full_context"]
+        ref = json.load(open(run_dir / "eval.json"))["checkpoints"][out["checkpoint"]]["full_context"]
         fc = fc_eval(rebuild_for_length(config, L, train.build_model), L, 1)
         diff = fc["bpc"] - ref["bpc"]
         out["sanity"] = {"window": L, "stride": 1, "bpc": fc["bpc"], "eval_json_bpc": ref["bpc"], "diff": diff,

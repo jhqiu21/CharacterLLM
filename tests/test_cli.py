@@ -161,3 +161,75 @@ def test_init_from_rejects_other_shapes(tiny_run):
     train.main(common + ["--run-name", "src"])
     with pytest.raises(ValueError, match="parameter shapes"):
         train.main(common + ["--run-name", "ft", "--init-from", "src", "--set", "model.d_model=32"])
+
+
+# ----------------------------------------------------------------------------------------------
+# training.checkpoint_selection=acc: select on validation accuracy, ties broken by the lower validation loss
+# ----------------------------------------------------------------------------------------------
+def _expected_acc_bpc_step(run_dir):
+    """Iteration of the earliest validation check with the highest (accuracy, -loss)."""
+    hist = json.load(open(run_dir / "metrics_history.json"))
+    keys = [(a, -loss) for a, loss in zip(hist["acc"], hist["loss_all_val"])]
+    return hist["iteration"][max(range(len(keys)), key=keys.__getitem__)]
+
+
+def test_acc_selection_saves_and_scores_the_best_accuracy_checkpoint(tiny_run):
+    from utils import load_checkpoint
+
+    tmp_path, data_dir, cfg_path = tiny_run
+    train.main(["--config", str(cfg_path), "--seed", "3", "--tuning", "--data-dir", str(data_dir),
+                "--set", "evaluation.tuning_val_stride=4", "--set", "training.checkpoint_selection=acc",
+                "--set", "training.epochs=12"])
+    run_dir = tmp_path / "runs" / "tiny_s3"
+    step = _expected_acc_bpc_step(run_dir)
+    d = tmp_path / "ckpt" / "tiny_s3"
+    assert load_checkpoint("best_acc_bpc_", "Best Accuracy (BPC tie-break)", d / "best", d / "stage")["step"] == step
+
+    out = json.load(open(run_dir / "val_eval.json"))
+    assert out["selected_checkpoint"] == "best_acc_bpc_"
+    assert out["checkpoints"]["best_acc_bpc_"]["step"] == step
+    val_len = len(train.load_data(data_dir, include_test=False)[1])
+    for prefix in ("best_acc_bpc_", "best_loss_all_"):  # the best-loss checkpoint is scored too, as a reference
+        assert out["checkpoints"][prefix]["full_context"]["n_scored"] == val_len - 1
+
+    timing = json.load(open(run_dir / "timing.json"))
+    assert timing["train_tokens"] == 12 * 4 * 16 and timing["updates"] == 12
+
+
+def test_loss_selection_saves_no_accuracy_bpc_checkpoint(tiny_run):
+    tmp_path, data_dir, cfg_path = tiny_run
+    train.main(["--config", str(cfg_path), "--seed", "3", "--tuning", "--data-dir", str(data_dir),
+                "--set", "evaluation.tuning_val_stride=4"])
+    assert not list((tmp_path / "ckpt" / "tiny_s3" / "best").glob("best_acc_bpc_*"))
+    out = json.load(open(tmp_path / "runs" / "tiny_s3" / "val_eval.json"))
+    assert out["selected_checkpoint"] == "best_loss_all_" and list(out["checkpoints"]) == ["best_loss_all_"]
+
+
+@pytest.mark.parametrize("selection,full", [("loss", "best_loss_all_"), ("acc", "best_acc_bpc_")])
+def test_test_evaluation_runs_every_mode_on_the_selected_checkpoint(tiny_run, selection, full):
+    tmp_path, data_dir, cfg_path = tiny_run
+    # (max_len 32: the legacy32 test mode scores 32-character blocks)
+    train.main(["--config", str(cfg_path), "--seed", "3", "--data-dir", str(data_dir),
+                "--set", f"training.checkpoint_selection={selection}", "--set", "evaluation.full_context_stride=8",
+                "--set", "model.max_len=32", "--set", "training.sequence_length=32"])
+    out = json.load(open(tmp_path / "runs" / "tiny_s3" / "eval.json"))
+    assert [p for p, e in out["checkpoints"].items() if "full_context" in e] == [full]
+    assert out["selected_checkpoint"] == full
+
+
+def test_eval_tools_load_the_selected_checkpoint(tiny_run):
+    import sys
+
+    sys.path.insert(0, str(train.REPO_ROOT / "scripts"))
+    from eval_extrapolation import load_run
+
+    tmp_path, data_dir, cfg_path = tiny_run
+    train.main(["--config", str(cfg_path), "--seed", "3", "--tuning", "--data-dir", str(data_dir),
+                "--set", "evaluation.tuning_val_stride=4", "--set", "training.checkpoint_selection=acc",
+                "--set", "training.epochs=12"])
+    run_dir = tmp_path / "runs" / "tiny_s3"
+    out = json.load(open(run_dir / "val_eval.json"))["checkpoints"]
+    _, _, ckpt = load_run("tiny_s3", runs_dir=tmp_path / "runs")
+    assert ckpt["step"] == out["best_acc_bpc_"]["step"] == _expected_acc_bpc_step(run_dir)
+    _, _, ckpt = load_run("tiny_s3", checkpoint="best_loss_all_", runs_dir=tmp_path / "runs")
+    assert ckpt["step"] == out["best_loss_all_"]["step"]

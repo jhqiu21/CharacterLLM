@@ -76,6 +76,17 @@ def test_stride1_matches_brute_force(setup):
         assert out[key] == pytest.approx(correct[sel].mean(), abs=1e-12)
 
 
+def test_top_k_accuracy_matches_brute_force(setup):
+    model, params, data = setup
+    out = full_context_eval(model, params, data, window=W, stride=1, batch_size=8, verbose=False)
+    contexts = [(t, max(0, t - W)) for t in range(1, N)]
+    _, logits, targets = _brute_force(model, params, data, contexts)
+    rank = (logits > logits[np.arange(len(targets)), targets][:, None]).sum(-1)  # characters scored above the target
+    for k in (2, 3, 5):
+        assert out[f"acc_top{k}"] == pytest.approx((rank < k).mean(), abs=1e-12)
+    assert out["acc"] <= out["acc_top2"] <= out["acc_top3"] <= out["acc_top5"]
+
+
 def test_stride7_matches_its_window_plan(setup):
     model, params, data = setup
     stride = 7

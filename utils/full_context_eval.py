@@ -15,6 +15,10 @@ and both model types see the same context.
 
 Windows are built on device from index arithmetic, batch by batch; the last batch is
 padded to the fixed shape (padded windows score nothing), so the forward pass compiles once.
+
+Accuracy: `acc` is top-1 (argmax == target); `acc_top{k}` (k in TOP_K) counts a target as correct when fewer
+than k characters get a strictly higher logit than it; `acc_rare` / `acc_common` are top-1 on the rare / common
+character subsets (frequency_groups).
 """
 
 import math
@@ -23,6 +27,8 @@ import time
 import jax
 import jax.numpy as jnp
 import numpy as np
+
+TOP_K = (2, 3, 5)
 
 
 def num_windows(n_chars, window, stride):
@@ -94,6 +100,8 @@ def make_eval_batch_fn(model, n_chars, window, stride, batch_size, vocab_size, n
         nll = -jnp.take_along_axis(logp, y[..., None], axis=-1)[..., 0]
         conf = jnp.exp(jnp.max(logp, axis=-1))
         correct = (jnp.argmax(logits, axis=-1) == y).astype(jnp.float32)
+        # characters with a strictly higher logit than the target's
+        rank = jnp.sum(logits > jnp.take_along_axis(logits, y[..., None], axis=-1), axis=-1)
 
         bins = jnp.digitize(conf, inner_edges).reshape(-1)
         mf, cf, conf_f, yf = m.reshape(-1), correct.reshape(-1), conf.reshape(-1), y.reshape(-1)
@@ -101,6 +109,7 @@ def make_eval_batch_fn(model, n_chars, window, stride, batch_size, vocab_size, n
             "nll_sum": jnp.sum(nll * m),
             "n_scored": jnp.sum(scored.astype(jnp.int32)),
             "n_correct": jnp.sum((correct * m).astype(jnp.int32)),
+            **{f"n_correct_top{k}": jnp.sum(((rank < k) & scored).astype(jnp.int32)) for k in TOP_K},
             "bin_count": jnp.zeros(n_bins, jnp.int32).at[bins].add(scored.reshape(-1).astype(jnp.int32)),
             "bin_conf_sum": jnp.zeros(n_bins, jnp.float32).at[bins].add(conf_f * mf),
             "bin_correct_sum": jnp.zeros(n_bins, jnp.int32).at[bins].add((cf * mf).astype(jnp.int32)),
@@ -161,6 +170,7 @@ def full_context_eval(model, params, data_int, window, stride=1, batch_size=4096
         "loss": float(mean_nll),
         "perplexity": float(np.exp(mean_nll)),
         "acc": float(totals["n_correct"] / n),
+        **{f"acc_top{k}": float(totals[f"n_correct_top{k}"] / n) for k in TOP_K},
         "ece": ece,
         "acc_rare": group_acc(rare_ids),
         "acc_common": group_acc(common_ids),

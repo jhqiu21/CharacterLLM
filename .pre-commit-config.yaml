@@ -31,10 +31,12 @@ repos:
         exclude: ^data/
       - id: end-of-file-fixer
         stages: [pre-commit]
-        exclude: ^data/
+        # results/v6/code/: verbatim git diffs, whose whitespace must stay as it is
+        exclude: ^(data/|results/v6/code/)
       - id: trailing-whitespace
         stages: [pre-commit]
-        exclude: ^data/
+        # results/v6/code/: verbatim git diffs, whose whitespace must stay as it is
+        exclude: ^(data/|results/v6/code/)
 
   # --- Custom hooks for full repo checks ---
   - repo: local
