@@ -74,6 +74,9 @@ GPU 3) before the launch.
 - the size: 4 layers / d_model 256 / 4 heads = **3,169,280** parameters vs 8 / 384 / 6 = **14,204,928** (printed by
   `train.py` and recorded in `tables/runs.md`).
 
+In `tables/` and `figures/` the two models carry the names used in the paper, **ALiBi-3.2M** (AL-3M) and **ALiBi-14.2M**
+(AL-14M); `paper_*.tex` are the tables the paper inputs.
+
 The models share the data split, preprocessing, loss (cross-entropy with the linear position weights, label smoothing 0,
 no entropy bonus), AdamW (b1 0.9, b2 0.95, weight decay 0.1 on matrices only, clip 1.0), warmup 2,000 + cosine to 0,
 dropout 0 and the evaluation. Batch 32 × 512 fits without gradient accumulation (peak 7.9 GiB for AL-14M), so none is
@@ -122,7 +125,7 @@ Acc_all of the v5 / v3 files exactly: largest difference 0 at all 36 (run, W) pa
 | model | 9e-4 (0.5×) | 1.8e-3 (1×) | 3.6e-3 (2×) | 7.2e-3 (4×, post-hoc) |
 |---|---|---|---|---|
 | AL-3M | 67.25 | 67.88 | **68.14** ← chosen | 68.22 |
-| AL-14M | 70.16 | 70.58 | **70.64** ← chosen | 70.49 |
+| AL-14M | 70.15 | 70.58 | **70.64** ← chosen | 70.48 |
 
 Both models picked 2×, the upper edge of the planned grid. The post-hoc 4× point, run after the formal runs, brackets
 the optimum for AL-14M (4× is 0.16 points worse). For AL-3M it does not: 4× is 0.08 better at 10,000 iterations. Short
@@ -215,7 +218,7 @@ Test, W = 512, stride 128, grouped by the target's position in its word (the sam
 |---|---|---|---|---|---|
 | space (end of a word) | 17.1% | 93.97 | 94.68 | +0.71 | 3.4% |
 | 1st letter of a word | 17.1% | 28.57 | **31.69** | +3.12 | **43.6%** |
-| 2nd letter | 16.5% | 58.97 | 62.80 | +3.83 | 22.8% |
+| 2nd letter | 16.4% | 58.97 | 62.80 | +3.83 | 22.8% |
 | 3rd letter | 14.1% | 69.18 | 73.23 | +4.05 | 14.1% |
 | 4th and later letters | 35.2% | 84.61 | 87.76 | +3.15 | 16.1% |
 | all | 100% | 70.23 | 73.20 | +2.97 | 100% |

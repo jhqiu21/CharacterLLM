@@ -4,7 +4,8 @@ Check that every number listed in results/v4/claims.md appears in its source tab
     python results/v4/check_claims.py
 
 claims.md rows: | id | value | file | row | column |
-- file: a Markdown table under results/v4/tables/ (e.g. pe_comparison.md);
+- file: a Markdown table under results/v4/tables/ (e.g. pe_comparison.md), or a path relative to results/ for the other
+  rounds (e.g. v6/tables/paper_errors.md);
 - row: the text of the table's first cell, or 'notes' for the text below the table; a row whose first cell repeats is
   given as 'cell1 @ cell2 [@ cell3 ...]' (the leading cells of that row);
 - column: the header text, or '-' for notes. The cell (or the notes) must contain `value` exactly as written, or, for a
@@ -67,7 +68,8 @@ def main():
         if fname in ("derived", "external", "pilot"):
             continue
         n += 1
-        header, rows, notes = parse_md_table((HERE / "tables" / fname).read_text())
+        path = HERE.parent / fname if "/" in fname else HERE / "tables" / fname
+        header, rows, notes = parse_md_table(path.read_text())
         if row == "notes":
             ok = value in notes or rounded_match(value, notes)
         else:

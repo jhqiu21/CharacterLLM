@@ -4,8 +4,10 @@ Every result number in the report (LaTeX source in the separate paper repository
 from. Tables in the report are `\input` from `results/v4/tables/*.tex` and are not repeated here; this list covers the numbers
 in the prose, captions and hand-written appendix tables.
 
-- `file` is a Markdown table under `results/v4/tables/`; `python results/v4/check_claims.py` checks every such row (exact
-  match, or the table value rounded half-up to the decimals shown in the text; the sign is ignored when the text gives none).
+- `file` is a Markdown table under `results/v4/tables/`, or a path under `results/` for the follow-up rounds (`v5/tables/...`:
+  repairs of RoPE beyond the training length; `v6/tables/...`: capacity and accuracy); `python results/v4/check_claims.py`
+  checks every such row (exact match, or the table value rounded half-up to the decimals shown in the text; the sign is
+  ignored when the text gives none).
 - `derived`: computed from checked rows; the formula is given. `external`: a published number; the source is given.
   `pilot`: a single pilot run from the original course report (commit `8f26249` of the paper repository,
   `content/4.Experiment.tex` and `content/3.Architecture.tex`); the raw logs were not kept, so these cannot be regenerated.
@@ -36,6 +38,10 @@ in the prose, captions and hand-written appendix tables.
 | R4 | 1.08 BPC, 277M parameters | external | Dai et al. 2019, Table 3 (https://ar5iv.labs.arxiv.org/html/1901.02860) | text8 test |
 | R5 | 14--87× | derived | 45M / 3.2M = 14; 277M / 3.2M = 87 | - |
 | R6 | 1.441--1.453 | derived | T13 (1.4412) and T1 (1.4532) | - |
+| R7 | up to about four passes cost little; the value of further passes decays | external | Muennighoff et al. 2023, abstract (https://arxiv.org/abs/2305.16264) | - |
+| R8 | 0.6 and 1.3 bits per character, 27 symbols, 100 characters of context | external | Shannon 1951, bounds table after Table I, column 100: upper 1.3, lower .6; spaces included as a 27th letter (p. 55) | - |
+| R9 | errors occur most often at the beginning of words and syllables | external | Shannon 1951, p. 55: "The errors, as would be expected, occur most frequently at the beginning of words and syllables" | - |
+| R10 | 80 of 100 trials at the first attempt, 99 preceding letters, dictionary and frequency tables | external | Shannon 1951, Table I, column 100, row 1 (= 80), and p. 56-57 (aids used by the subject) | - |
 
 ## Setup
 
@@ -184,9 +190,123 @@ in the prose, captions and hand-written appendix tables.
 | X26 | 0.330 | attention_summary.md | RoPE @ 128 | Best word-boundary head |
 | X27 | 1 / 1 / 1 / 1 | attention_short_range.md | RoPE, W=128 | Peak distance (chars) |
 | X28 | 0 / 5 / 3 / 1 | attention_short_range.md | RoPE + PI, W=512 | Peak distance (chars) |
-| X29 | 0.70 / 0.76 / 0.76 / 0.42 | attention_short_range.md | RoPE, W=128 | Mean weight on distances 0-2 |
-| X30 | 0.25 / 0.19 / 0.31 / 0.16 | attention_short_range.md | RoPE + PI, W=512 | Mean weight on distances 0-2 |
+| X29 | 0.70 / 0.76 / 0.76 / 0.42 | attention_short_range.md | RoPE, W=128 | Profile summed over d = 0-2 |
+| X30 | 0.25 / 0.19 / 0.31 / 0.16 | attention_short_range.md | RoPE + PI, W=512 | Profile summed over d = 0-2 |
 | X31 | 0.028 / 0.004 (uniform) | derived | `space_mass_uniform` in `results/v3/raw/TR-final_s42/attention_W{128,512}/stats.json` (attention_summary.csv, column space_uniform) | - |
+
+## Repairs of RoPE beyond the training length (v5)
+
+| id | value | file | row | column |
+|---|---|---|---|---|
+| F1 | 0.023 (abstract, intro: SelfExtend gain) | v5/tables/differences.md | RoPE + SelfExtend floor, near 64 − RoPE at W=128, stride 1 | W=512 |
+| F2 | 4, 8 and 16 (SelfExtend groups, n = 64) | derived | `utils/extrapolation_eval.self_extend_group(128, W, 64, "floor")` for W = 256, 512, 1024 | - |
+| F3 | N = 128, n = 64 selected | derived | † rows of v5/tables/inference_variants_val.md (lowest validation BPC at W = 1024 per family) | - |
+| F4 | 1.4532 | v5/tables/paper_repair.md | RoPE | W=128, stride 1 |
+| F5 | 1.4535 | v5/tables/paper_repair.md | RoPE + local attention 128 | W=512 |
+| F6 | +0.0003 ± 0.0006 | v5/tables/differences.md | RoPE + local attention 128 − RoPE at W=128, stride 1 | W=512 |
+| F7 | 1.488 | v5/tables/inference_variants.md | RoPE + local attention 64 | W=256 |
+| F8 | 1.536 | v5/tables/inference_variants.md | RoPE + local attention 32 | W=256 |
+| F9 | 1.4304 | v5/tables/paper_repair.md | RoPE + SelfExtend (near 64) | W=512 |
+| F10 | 0.0228 ± 0.0057 | v5/tables/differences.md | RoPE + SelfExtend floor, near 64 − RoPE at W=128, stride 1 | W=512 |
+| F11 | better in every seed (SelfExtend vs truncation, W = 512) | derived | per seed 42 / 43 / 44: -0.0163 / -0.0266 / -0.0255 (`raw/TR-final_s*/extrapolation_sefloor64.json` minus the run's full-context BPC) | - |
+| F12 | 2.55 | v5/tables/differences.md | RoPE + SelfExtend floor, near 64 − RoPE + PI | W=512 |
+| F13 | +0.0051 ± 0.0072 | v5/tables/differences.md | RoPE + SelfExtend floor, near 64 − RoPE at W=128, stride 1 | W=1024 |
+| F14 | 1.4337 | v5/tables/paper_repair.md | RoPE + 512-window fine-tuning @ 16.4M | W=512 |
+| F15 | 1.4133 | v5/tables/paper_repair.md | RoPE + 512-window fine-tuning @ 65.5M | W=512 |
+| F16 | 1.4588 | v5/tables/paper_repair.md | RoPE + PI + 512-window fine-tuning @ 16.4M | W=512 |
+| F17 | 1.4201 | v5/tables/paper_repair.md | RoPE + PI + 512-window fine-tuning @ 65.5M | W=512 |
+| F18 | 0.0252 ± 0.0022 | v5/tables/differences.md | PI fine-tuning − 512-window fine-tuning (does PI add anything after adaptation?) | W=512 |
+| F19 | 0.0068 ± 0.0029 | v5/tables/budget_differences.md | PI fine-tuning − 512-window fine-tuning, 4,000 it. | W=512 |
+| F20 | PI worse in every seed (1,000 and 4,000 it., W = 512) | derived | per seed 42 / 43 / 44: +0.0245 / +0.0234 / +0.0276 (1k), +0.0035 / +0.0085 / +0.0085 (4k) | - |
+| F21 | 0.059 | v5/tables/differences.md | RoPE + PI + 512-window fine-tuning − its base model, W=128 stride 1 | W=128 |
+| F22 | 0.017 | v5/tables/differences.md | RoPE + 512-window fine-tuning − its base model, W=128 stride 1 | W=128 |
+| F23 | (it. 0) | v5/tables/ft_lr_grid.md | RoPE + 128-window fine-tuning | lr 3e-5 |
+| F24 | 1.724 | v5/tables/paper_repair.md | RoPE + 512-window fine-tuning @ 65.5M | W=1024 |
+| F25 | 5.400 | v5/tables/paper_repair.md | RoPE + PI + 512-window fine-tuning @ 65.5M | W=1024 |
+| F26 | 1 / 1 / 1 / 1 | v5/tables/attention_short_range.md | RoPE + PI + 512-window fine-tuning, W=512 | Peak distance (chars) |
+| F27 | 0.72 / 0.81 / 0.77 / 0.38 | v5/tables/attention_short_range.md | RoPE + PI + 512-window fine-tuning, W=512 | Profile summed over d = 0-2 |
+| F28 | 0.70 / 0.76 / 0.76 / 0.42 | v5/tables/attention_short_range.md | RoPE, W=128 | Profile summed over d = 0-2 |
+| F29 | -0.0063 ± 0.0083 | v5/tables/budget_differences.md | 512-window fine-tuning, 4,000 it. − ALiBi | W=512 |
+| F30 | signs differing across seeds | derived | per seed 42 / 43 / 44: +0.0013 / -0.0151 / -0.0053 | - |
+| F31 | 1.3969 | v5/tables/paper_repair.md | ALiBi + 512-window fine-tuning | W=1024 |
+| F32 | 0.043 (discussion: PI deficit at W = 128, full context, 1,000 it.) | derived | v5/tables/finetune.md W=128 stride 1: 1.5127 − 1.4698 = 0.0429 (per seed +0.0415 / +0.0409 / +0.0462) | - |
+| F33 | 0.025 (discussion) | v5/tables/differences.md | PI fine-tuning − 512-window fine-tuning (does PI add anything after adaptation?) | W=512 |
+| F34 | iteration 49,999; warmup 50 / 200; lr 3e-4 / 1e-3 / 3e-5 (appendix table) | derived | `results/v5/raw/ft*/config.yaml` (run.init_from_step, scheduler.warmup_iters, training.learning_rate); * rows of v5/tables/ft_lr_grid.md | - |
+
+## Capacity and next-character accuracy (v6)
+
+| id | value | file | row | column |
+|---|---|---|---|---|
+| C1 | 70.2% (abstract) | v6/tables/paper_capacity.md | ALiBi-3.2M | Acc_all (%) |
+| C2 | 73.2% (abstract, intro, analysis, conclusion) | v6/tables/paper_capacity.md | ALiBi-14.2M | Acc_all (%) |
+| C3 | 14,204,928 | v6/tables/runs.md | v6-AL-14M_s42 | parameters |
+| C4 | 819.2M characters | derived | 50,000 iterations × 32 × 512 = 819,200,000 (`timing.json` train_tokens) | - |
+| C5 | 3.6e-3 * | v6/tables/paper_search.md | ALiBi-14.2M @ 3.6e-3 * | Peak lr |
+| C38 | 3.6e-3 * | v6/tables/paper_search.md | ALiBi-3.2M @ 3.6e-3 * | Peak lr |
+| C6 | 73.20 | v6/tables/paper_capacity.md | ALiBi-14.2M | Acc_all (%) |
+| C7 | 70.23 | v6/tables/paper_capacity.md | ALiBi-3.2M | Acc_all (%) |
+| C8 | +2.97 ± 0.04 | v6/tables/paper_capacity.md | ALiBi-14.2M − ALiBi-3.2M | Acc_all (%) |
+| C9 | 0.136 (lower BPC) | v6/tables/paper_capacity.md | ALiBi-14.2M − ALiBi-3.2M | BPC |
+| C10 | +2.76 | v6/tables/paired_test.md | 128 @ Acc_all (%) | ALiBi-14.2M − ALiBi-3.2M |
+| C11 | +3.04 | v6/tables/paired_test.md | 256 @ Acc_all (%) | ALiBi-14.2M − ALiBi-3.2M |
+| C12 | +2.95 ± 0.04 | v6/tables/formal_val.md | mean ± std | Δ Acc (pp) |
+| C13 | 4.35 (rare characters) | v6/tables/paper_capacity.md | ALiBi-14.2M − ALiBi-3.2M | Acc_rare (%) |
+| C14 | 0.63 | derived | 70.23 − 69.60 (v6/tables/paper_capacity.md, ALiBi-3.2M and Transformer (ALiBi) + 512-window fine-tuning) | - |
+| C15 | 163.8M | derived | 10,000 × 16,384 = 163,840,000 | - |
+| C16 | +1.92 | v6/tables/budget_scaling.md | ALiBi-3.2M | 5× characters: Δ Acc (pp) |
+| C17 | +2.41 | v6/tables/budget_scaling.md | ALiBi-14.2M | 5× characters: Δ Acc (pp) |
+| C18 | +2.50 | v6/tables/budget_scaling.md | ALiBi-14.2M − ALiBi-3.2M | val Acc_all, 164M chars (%) |
+| C19 | +2.99 | v6/tables/budget_scaling.md | ALiBi-14.2M − ALiBi-3.2M | val Acc_all, 819M chars (%) |
+| C20 | 70.64 | v6/tables/budget_scaling.md | ALiBi-14.2M | val Acc_all, 164M chars (%) |
+| C21 | 70.06 | v6/tables/budget_scaling.md | ALiBi-3.2M | val Acc_all, 819M chars (%) |
+| C22 | 17 (minutes) | v6/tables/runs.md | v6search-AL-14M_lr3.6e-3 | training min |
+| C23 | 28 (minutes) | v6/tables/runs.md | v6-AL-3M_s42 | training min |
+| C24 | 0.098 | v6/tables/runs.md | v6-AL-14M_s42 | s / update (median) |
+| C25 | 0.031 | v6/tables/runs.md | v6-AL-3M_s42 | s / update (median) |
+| C26 | 3.1 times | derived | 0.0982 / 0.0314 = 3.13 (C24, C25) | - |
+| C27 | lowest validation loss in the last 1,000 iterations | derived | v6/tables/curves.md, "iteration of lowest val BPC": 49,000-49,999 in all 6 runs | - |
+| C28 | 0.7--0.9 points | derived | v6/tables/curves.md, val Acc @ 50k − @ 40k: 0.74 / 0.77 / 0.81 (3.2M), 0.80 / 0.69 / 0.85 (14.2M) | - |
+| C29 | 0.13--0.14 | derived | v6/tables/curves.md, "val − train BPC @ 50k", ALiBi-14.2M: 0.1371 / 0.1324 / 0.1355 | - |
+| C30 | 0.08--0.09 | derived | same, ALiBi-3.2M: 0.0888 / 0.0815 / 0.0830 | - |
+| C31 | about six of the 9.6 passes | derived | `figures/training_curves.*`: the ALiBi-14.2M gap steepens after about 500M characters = 5.8 passes of 85.5M | - |
+| C32 | 5× (intro: capacity helped more than five times more characters) | derived | 819.2M / 163.84M = 5 (C16-C19) | - |
+| C33 | 3.2M, 14.2M | derived | 3,169,280 and 14,204,928 (v6/tables/runs.md) | - |
+| C34 | 0.08 points (limitations) | derived | 68.22 − 68.14 (v6/tables/paper_search.md, ALiBi-3.2M @ 7.2e-3 † and @ 3.6e-3 *); exact 68.2203 − 68.1393 = 0.081 | - |
+| C35 | 0.1 point (possible overstatement) | derived | C34 | - |
+| C36 | 4.5× | derived | 14,204,928 / 3,169,280 = 4.48 | - |
+| C37 | q, j, x, z, k / space, e, t, a, n | derived | `frequency_groups` in `results/v6/raw/v6-AL-14M_s42/val_eval.json` (5 least / most frequent training characters) | - |
+
+## Why accuracy is limited (v6 analysis)
+
+| id | value | file | row | column |
+|---|---|---|---|---|
+| Y1 | 73.4 | v6/tables/test_by_W.md | ALiBi-14.2M (512, from scratch) @ Acc_all (%) | W=1024 |
+| Y2 | 94.7 | v6/tables/paper_errors.md | space | Acc, 14.2M (%) |
+| Y3 | 87.8 | v6/tables/paper_errors.md | 4th+ letter | Acc, 14.2M (%) |
+| Y4 | 31.7 | v6/tables/paper_errors.md | 1st letter | Acc, 14.2M (%) |
+| Y5 | 3.32 | v6/tables/paper_errors.md | 1st letter | BPC, 14.2M |
+| Y6 | 17.1 | v6/tables/paper_errors.md | 1st letter | Targets (%) |
+| Y7 | 43.6 | v6/tables/paper_errors.md | 1st letter | Errors, 14.2M (%) |
+| Y8 | 62.8 | v6/tables/paper_errors.md | 2nd letter | Acc, 14.2M (%) |
+| Y9 | two thirds | derived | 43.6 + 22.8 = 66.4 (v6/tables/paper_errors.md, Errors column) | - |
+| Y10 | 82.8 | v6/tables/paper_capacity.md | ALiBi-14.2M | Top-2 (%) |
+| Y11 | 91.9 | v6/tables/paper_capacity.md | ALiBi-14.2M | Top-5 (%) |
+| Y12 | 26.8, 9.6 and 18.7 points | derived | 100 − 73.20; 82.77 − 73.20 = 9.57; 91.90 − 73.20 = 18.70 | - |
+| Y13 | 3.1--4.1 points | derived | v6/tables/paper_errors.md Δ: +3.12, +3.83, +4.05, +3.15 | - |
+| Y14 | 0.7 points (spaces) | v6/tables/paper_errors.md | space | Δ |
+| Y15 | about 1.4 points per doubling | derived | 2.97 / log2(14,204,928 / 3,169,280) = 2.97 / 2.164 = 1.37 | - |
+| Y16 | 37.8M, about 75% | derived | 12 layers, d_model 512, 8 heads: 37,832,704 parameters (`train.build_model`); 73.20 + 1.37 × log2(37.83 / 14.20) = 75.1 | - |
+| Y17 | about five more doublings | derived | (80 − 73.20) / 1.37 = 5.0 | - |
+| Y18 | 0.18 | derived | 73.38 − 73.20 (v6/tables/test_by_W.md, ALiBi-14.2M Acc_all, W=1024 and W=512) | - |
+| Y19 | 0.30 | derived | 70.53 − 70.23 (same, ALiBi-3.2M) | - |
+| Y20 | 1.234 | v6/tables/test_by_W.md | ALiBi-14.2M (512, from scratch) @ BPC | W=1024 |
+| Y21 | 69.3% | v6/tables/test_W512.md | Transformer (ALiBi), 128 only | Acc_all (%) |
+| Y22 | 1.420 | v6/tables/test_W512.md | Transformer (ALiBi), 128 only | BPC |
+| Y23 | 1.244 | v6/tables/paper_capacity.md | ALiBi-14.2M | BPC |
+| Y24 | about 22 points per BPC | derived | (73.20 − 69.31) / (1.4196 − 1.2440) = 22.2; least-squares slope over the five models of v6/tables/test_W512.md: 22.1 | - |
+| Y25 | about 0.94 BPC | derived | least-squares line over v6/tables/test_W512.md: Acc = 100.75 − 22.14 × BPC, 80% at 0.937 | - |
+| Y26 | twenty times larger | derived | 277M / 14.2M = 19.5 (R4) | - |
+| Y27 | 17% / 44% (intro, abstract) | derived | Y6, Y7 rounded | - |
 
 ## Appendix
 

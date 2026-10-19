@@ -1,0 +1,12 @@
+Learning-rate search, validation split (W = 512, stride 128), 10,000 iterations, seed 4212, selected checkpoint. * = chosen; † = post-hoc check, not used for the choice.
+
+| Model | Peak lr | Acc_all (%) | BPC |
+|---|---|---|---|
+| ALiBi-3.2M | 9e-4 | 67.25 | 1.5237 |
+| ALiBi-3.2M | 1.8e-3 | 67.88 | 1.4951 |
+| ALiBi-3.2M | 3.6e-3 * | 68.14 | 1.4822 |
+| ALiBi-3.2M | 7.2e-3 † | 68.22 | 1.4789 |
+| ALiBi-14.2M | 9e-4 | 70.15 | 1.3866 |
+| ALiBi-14.2M | 1.8e-3 | 70.58 | 1.3679 |
+| ALiBi-14.2M | 3.6e-3 * | 70.64 | 1.3639 |
+| ALiBi-14.2M | 7.2e-3 † | 70.48 | 1.3709 |

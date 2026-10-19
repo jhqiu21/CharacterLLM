@@ -1,12 +1,14 @@
 # Results index
 
-Every number in the report comes from **`v4/`** (which reads `v3/raw/` and `v4/raw/`). The other folders document how the
-final configuration was reached and are kept for traceability; their numbers are superseded.
+Every number in the report comes from **`v4/`** (which reads `v3/raw/` and `v4/raw/`) and, for the follow-up sections
+(repairs of RoPE beyond the training length; capacity and next-character accuracy), from **`v5/`** and **`v6/`**. `v4/claims.md`
+traces every number in the report text to one of these folders. The other folders document how the final configuration was
+reached and are kept for traceability; their numbers are superseded.
 
 | folder | status | what it holds |
 |---|---|---|
-| [`v6/`](v6/REPORT.md) | current (follow-up, not in the report yet) | Capacity study: ALiBi 3.2M vs 14.2M trained from scratch on 512-character windows (819M training characters, checkpoints selected by validation accuracy), Acc_all / Top-k of the best v5 models. `aggregate_v6.py` rebuilds its tables and figures from `v6/raw/` (+ `v5/raw/`, `v3/raw/`); `code/` holds the code snapshots (HEAD + uncommitted diff) taken at every launch. |
-| [`v5/`](v5/REPORT.md) | current (follow-up, not in the report yet) | Fixing RoPE beyond its training length: evaluation-only variants (local attention, SelfExtend) and long-window fine-tuning with and without position interpolation, 1,000 and 4,000 iterations. `aggregate_v5.py` rebuilds its tables and figures from `v5/raw/` (+ `v3/raw/`, `v4/raw/` for reference rows). |
+| [`v6/`](v6/REPORT.md) | **current** (report: capacity and accuracy) | Capacity study: ALiBi 3.2M vs 14.2M trained from scratch on 512-character windows (819M training characters, checkpoints selected by validation accuracy), Acc_all / Top-k of the best v5 models. `aggregate_v6.py` rebuilds its tables and figures from `v6/raw/` (+ `v5/raw/`, `v3/raw/`); `code/` holds the code snapshots (HEAD + uncommitted diff) taken at every launch. |
+| [`v5/`](v5/REPORT.md) | **current** (report: repairs of RoPE) | Fixing RoPE beyond its training length: evaluation-only variants (local attention, SelfExtend) and long-window fine-tuning with and without position interpolation, 1,000 and 4,000 iterations. `aggregate_v5.py` rebuilds its tables and figures from `v5/raw/` (+ `v3/raw/`, `v4/raw/` for reference rows). |
 | [`v4/`](v4/REPORT.md) | **current** | Final tables and figures of the report: Transformer vs LSTMs, seven positional encodings (incl. NoPE), dropout, length extrapolation (incl. position interpolation), attention analysis, learning-rate bracket check. `aggregate_v4.py` rebuilds everything; `claims.md` traces every number in the report to a file. |
 | [`v3/`](v3/REPORT.md) | current raw data, superseded tables | The 36 final 50k-iteration runs (3 seeds each), extrapolation and attention evaluations. `v3/raw/` is read by `v4/aggregate_v4.py`; `v3/tables` and `v3/figures` use the old model names (TR, LR-1, LR-2). |
 | [`v3_tuning/`](v3_tuning/REPORT.md) | current (protocol) | The validation-only hyperparameter search (learning rate, dropout, label smoothing) and its decision rules, fixed before the runs. |
@@ -40,7 +42,13 @@ All paths relative to `results/v4/`. Tables exist as `.csv`, `.md` and booktabs 
 | Per-position loss in 64-position buckets | `tables/per_position_buckets_W1024.*` | `*/raw/<run>/extrapolation*.json` |
 | Short-range attention (position interpolation) | `tables/attention_short_range.*`, `figures/attention_short_range.*` | `*/raw/<run>_s42/attention_W*/stats.json` |
 | Generated text sample | — | `v4/raw/TR-final_s42/sample_best_loss.txt` |
+| Repairs of RoPE beyond the training length (report table and figure) | `v5/tables/paper_repair.*`, `v5/figures/bpc_vs_W.*` | `v5/raw/`, `v4/raw/`, `v3/raw/` (`aggregate_v5.py`) |
+| Local-attention / SelfExtend selection, fine-tuning learning rates | `v5/tables/inference_variants_val.*`, `v5/tables/ft_lr_grid.*` | `v5/raw/` |
+| Model capacity at fixed training data | `v6/tables/paper_capacity.*`, `v6/tables/test_by_W.*` | `v6/raw/v6-AL-*`, `v6/raw/<v5 / v3 run>/extrapolation_v6.json` (`aggregate_v6.py`) |
+| Accuracy by position in the word | `v6/tables/paper_errors.*` | `v6/raw/<run>/errors_W512.json` |
+| Capacity learning rates, size vs training characters, training curves | `v6/tables/paper_search.*`, `v6/tables/budget_scaling.*`, `v6/figures/training_curves.*` | `v6/raw/v6search-*`, `v6/raw/v6-AL-*/val_history.json` |
 
-Regenerate everything with `python results/v4/aggregate_v4.py` (add `--sync` to first copy new outputs from `runs/`);
-`python results/v4/export_paper.py --paper <paper dir>` copies the tables (`.tex`) and figures (`.pdf`) into the LaTeX source,
-and `python results/v4/check_claims.py` checks the numbers listed in `v4/claims.md` against the tables.
+Regenerate everything with `python results/v4/aggregate_v4.py`, `results/v5/aggregate_v5.py` and `results/v6/aggregate_v6.py`
+(add `--sync` to first copy new outputs from `runs/`); `python results/v4/export_paper.py --paper <paper dir>` copies the tables
+(`.tex`) and figures (`.pdf`) of v4, v5 and v6 into the LaTeX source, and `python results/v4/check_claims.py` checks the numbers
+listed in `v4/claims.md` against the tables.

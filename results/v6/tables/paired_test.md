@@ -1,6 +1,6 @@
-Seed-matched test differences AL-14M − AL-3M (stride 128).
+Seed-matched test differences ALiBi-14.2M − ALiBi-3.2M (stride 128).
 
-| W | metric | AL-14M − AL-3M | seeds | per seed (42 / 43 / 44) | signs |
+| W | metric | ALiBi-14.2M − ALiBi-3.2M | seeds | per seed (42 / 43 / 44) | signs |
 |---|---|---|---|---|---|
 | 128 | BPC | -0.1255 ± 0.0014 | 3 | -0.1263 / -0.1240 / -0.1263 | −−− |
 | 128 | Acc_all (%) | +2.76 ± 0.02 | 3 | +2.77 / +2.73 / +2.77 | +++ |

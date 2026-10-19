@@ -1,4 +1,4 @@
-model,lr,"val Acc_all, 164M chars (%)",val BPC,"val Acc_all, 819M chars (%)",val BPC,5× characters: Δ Acc (pp)
-AL-3M (3.2M),3.6e-3,68.14,1.4822,70.06,1.3950,+1.92
-AL-14M (14.2M),3.6e-3,70.64,1.3639,73.05,1.2574,+2.41
-AL-14M − AL-3M,,+2.50,-0.1183,+2.99,-0.1377,
+Model,lr,"val Acc_all, 164M chars (%)",val BPC,"val Acc_all, 819M chars (%)",val BPC,5× characters: Δ Acc (pp)
+ALiBi-3.2M,3.6e-3,68.14,1.4822,70.06,1.3950,+1.92
+ALiBi-14.2M,3.6e-3,70.64,1.3639,73.05,1.2574,+2.41
+ALiBi-14.2M − ALiBi-3.2M,,+2.50,-0.1183,+2.99,-0.1377,

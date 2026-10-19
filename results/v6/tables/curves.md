@@ -1,6 +1,6 @@
 Fixed validation set (1,024 windows × 512, all positions) during the formal runs. Train BPC = mean unweighted loss on the training batches over the last 1,000 iterations (no dropout, so the same model as at validation). Passes over the 85.5M-character training split: 0.96 at 5k iterations, 1.9 at 10k, 9.6 at 50k.
 
-| model | seed | val Acc @ 5k (%) | val Acc @ 10k (%) | val Acc @ 20k (%) | val Acc @ 30k (%) | val Acc @ 40k (%) | val Acc @ 50k (%) | val BPC @ 50k | iteration of lowest val BPC | val − train BPC @ 5k | val − train BPC @ 10k | val − train BPC @ 30k | val − train BPC @ 50k |
+| Model | Seed | val Acc @ 5k (%) | val Acc @ 10k (%) | val Acc @ 20k (%) | val Acc @ 30k (%) | val Acc @ 40k (%) | val Acc @ 50k (%) | val BPC @ 50k | iteration of lowest val BPC | val − train BPC @ 5k | val − train BPC @ 10k | val − train BPC @ 30k | val − train BPC @ 50k |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | AL-3M | 42 | 63.18 | 64.32 | 65.46 | 66.55 | 67.97 | 68.71 | 1.4612 | 49999 | +0.0329 | +0.0440 | +0.0609 | +0.0888 |
 | AL-3M | 43 | 63.05 | 64.22 | 65.31 | 66.60 | 67.88 | 68.65 | 1.4579 | 49999 | +0.0323 | +0.0419 | +0.0564 | +0.0815 |

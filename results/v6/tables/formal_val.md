@@ -1,6 +1,6 @@
 Formal runs (50,000 iterations, 819,200,000 training characters): whole validation split, W = 512, stride 128, at the selected checkpoint.
 
-| seed | AL-3M val Acc_all (%) | AL-3M val BPC | step | AL-14M val Acc_all (%) | AL-14M val BPC | step | Δ Acc (pp) | Δ BPC |
+| seed | ALiBi-3.2M val Acc_all (%) | ALiBi-3.2M val BPC | step | ALiBi-14.2M val Acc_all (%) | ALiBi-14.2M val BPC | step | Δ Acc (pp) | Δ BPC |
 |---|---|---|---|---|---|---|---|---|
 | 42 | 70.06 | 1.3950 | 48000 | 73.05 | 1.2574 | 49000 | +2.99 | -0.1377 |
 | 43 | 70.12 | 1.3915 | 49999 | 73.03 | 1.2580 | 49999 | +2.90 | -0.1335 |
