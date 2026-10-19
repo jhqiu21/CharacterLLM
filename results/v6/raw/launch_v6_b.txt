@@ -1,0 +1,104 @@
+phase seeds: validation acc AL-14M 73.049% vs AL-3M 70.059% (gain +2.990 pp, rule >= 0.3), BPC 1.2574 vs 1.3950 -> clear gain: run seeds 43, 44
+phase seeds: AL-3M lr 3.6e-3 (search: [('9e-4', 0.672516, 1.523742), ('1.8e-3', 0.678826, 1.495079), ('3.6e-3', 0.681393, 1.482245)])
+phase seeds: AL-14M lr 3.6e-3 (search: [('9e-4', 0.701545, 1.386556), ('1.8e-3', 0.705774, 1.367886), ('3.6e-3', 0.706417, 1.363941)])
+[2026-10-17 14:43:25] GPUs [2, 3]; phase seeds; skipped (finished): []
+Queue:
+  v6-AL-14M_s43: train.py --config results/v6/configs/AL-14M.yaml --seed 43 --run-name v6-AL-14M_s43 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+  v6-AL-14M_s44: train.py --config results/v6/configs/AL-14M.yaml --seed 44 --run-name v6-AL-14M_s44 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+  v6-AL-3M_s43: train.py --config results/v6/configs/AL-3M.yaml --seed 43 --run-name v6-AL-3M_s43 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+  v6-AL-3M_s44: train.py --config results/v6/configs/AL-3M.yaml --seed 44 --run-name v6-AL-3M_s44 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+code snapshot: results/v6/code/20261017-144325_seeds_73f222e_f88718850820.patch
+[2026-10-17 14:43:26] started v6-AL-14M_s43 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-14M.yaml --seed 43 --run-name v6-AL-14M_s43 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+[2026-10-17 14:50:32] started v6-AL-14M_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-14M.yaml --seed 44 --run-name v6-AL-14M_s44 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+[2026-10-17 16:09:47] finished v6-AL-14M_s43 on GPU 2: rc=0, complete=True, 86.4 min
+[2026-10-17 16:09:48] skipped v6-AL-3M_s43: finished meanwhile
+[2026-10-17 16:09:58] started v6-AL-3M_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-3M.yaml --seed 44 --run-name v6-AL-3M_s44 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+[2026-10-17 16:16:37] finished v6-AL-14M_s44 on GPU 3: rc=0, complete=True, 86.1 min
+[2026-10-17 16:38:13] finished v6-AL-3M_s44 on GPU 2: rc=0, complete=True, 28.2 min
+[2026-10-17 16:38:23] queue empty; failed: []
+[2026-10-17 16:38:23] GPUs [2, 3]; phase bracket; skipped (finished): []
+Queue:
+  v6search-AL-3M_lr7.2e-3: train.py --config results/v6/configs/AL-3M.yaml --seed 4212 --run-name v6search-AL-3M_lr7.2e-3 --tuning --set training.learning_rate=7.2e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+  v6search-AL-14M_lr7.2e-3: train.py --config results/v6/configs/AL-14M.yaml --seed 4212 --run-name v6search-AL-14M_lr7.2e-3 --tuning --set training.learning_rate=7.2e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+code snapshot: results/v6/code/20261017-163823_bracket_73f222e_fff41f232120.patch
+[2026-10-17 16:38:23] started v6search-AL-3M_lr7.2e-3 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-3M.yaml --seed 4212 --run-name v6search-AL-3M_lr7.2e-3 --tuning --set training.learning_rate=7.2e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+[2026-10-17 16:38:23] started v6search-AL-14M_lr7.2e-3 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-14M.yaml --seed 4212 --run-name v6search-AL-14M_lr7.2e-3 --tuning --set training.learning_rate=7.2e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+[2026-10-17 16:45:03] finished v6search-AL-3M_lr7.2e-3 on GPU 2: rc=0, complete=True, 6.7 min
+[2026-10-17 16:57:29] finished v6search-AL-14M_lr7.2e-3 on GPU 3: rc=0, complete=True, 19.1 min
+[2026-10-17 16:57:39] queue empty; failed: []
+[2026-10-17 16:57:39] GPUs [2, 3]; phase evals; skipped (finished): []
+Queue:
+  val:v6-AL-3M_s42: scripts/eval_extrapolation.py --run v6-AL-3M_s42 --split val --lengths 128 256 512 1024
+  val:v6-AL-14M_s42: scripts/eval_extrapolation.py --run v6-AL-14M_s42 --split val --lengths 128 256 512 1024
+  val:v6-AL-3M_s43: scripts/eval_extrapolation.py --run v6-AL-3M_s43 --split val --lengths 128 256 512 1024
+  val:v6-AL-14M_s43: scripts/eval_extrapolation.py --run v6-AL-14M_s43 --split val --lengths 128 256 512 1024
+  val:v6-AL-3M_s44: scripts/eval_extrapolation.py --run v6-AL-3M_s44 --split val --lengths 128 256 512 1024
+  val:v6-AL-14M_s44: scripts/eval_extrapolation.py --run v6-AL-14M_s44 --split val --lengths 128 256 512 1024
+  test:v6-AL-3M_s42: scripts/eval_extrapolation.py --run v6-AL-3M_s42 --split test --lengths 128 256 512 1024
+  test:v6-AL-14M_s42: scripts/eval_extrapolation.py --run v6-AL-14M_s42 --split test --lengths 128 256 512 1024
+  test:v6-AL-3M_s43: scripts/eval_extrapolation.py --run v6-AL-3M_s43 --split test --lengths 128 256 512 1024
+  test:v6-AL-14M_s43: scripts/eval_extrapolation.py --run v6-AL-14M_s43 --split test --lengths 128 256 512 1024
+  test:v6-AL-3M_s44: scripts/eval_extrapolation.py --run v6-AL-3M_s44 --split test --lengths 128 256 512 1024
+  test:v6-AL-14M_s44: scripts/eval_extrapolation.py --run v6-AL-14M_s44 --split test --lengths 128 256 512 1024
+  errors:v6-AL-3M_s42: scripts/analyze_errors.py --run v6-AL-3M_s42 --length 512
+  errors:v6-AL-14M_s42: scripts/analyze_errors.py --run v6-AL-14M_s42 --length 512
+  errors:v6-AL-3M_s43: scripts/analyze_errors.py --run v6-AL-3M_s43 --length 512
+  errors:v6-AL-14M_s43: scripts/analyze_errors.py --run v6-AL-14M_s43 --length 512
+  errors:v6-AL-3M_s44: scripts/analyze_errors.py --run v6-AL-3M_s44 --length 512
+  errors:v6-AL-14M_s44: scripts/analyze_errors.py --run v6-AL-14M_s44 --length 512
+  errors:ft4k-alibi512_lr3e-5_s42: scripts/analyze_errors.py --run ft4k-alibi512_lr3e-5_s42 --length 512
+  errors:ft4k-alibi512_lr3e-5_s43: scripts/analyze_errors.py --run ft4k-alibi512_lr3e-5_s43 --length 512
+  errors:ft4k-alibi512_lr3e-5_s44: scripts/analyze_errors.py --run ft4k-alibi512_lr3e-5_s44 --length 512
+  errors:ft4k-long512_lr3e-4_s42: scripts/analyze_errors.py --run ft4k-long512_lr3e-4_s42 --length 512
+  errors:ft4k-long512_lr3e-4_s43: scripts/analyze_errors.py --run ft4k-long512_lr3e-4_s43 --length 512
+  errors:ft4k-long512_lr3e-4_s44: scripts/analyze_errors.py --run ft4k-long512_lr3e-4_s44 --length 512
+code snapshot: results/v6/code/20261017-165739_evals_73f222e_fff41f232120.patch
+[2026-10-17 16:57:39] started val:v6-AL-3M_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-3M_s42 --split val --lengths 128 256 512 1024
+[2026-10-17 16:57:39] started val:v6-AL-14M_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-14M_s42 --split val --lengths 128 256 512 1024
+[2026-10-17 16:59:25] finished val:v6-AL-3M_s42 on GPU 2: rc=0, complete=True, 1.8 min
+[2026-10-17 16:59:25] started val:v6-AL-3M_s43 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-3M_s43 --split val --lengths 128 256 512 1024
+[2026-10-17 17:01:12] finished val:v6-AL-3M_s43 on GPU 2: rc=0, complete=True, 1.8 min
+[2026-10-17 17:01:12] started val:v6-AL-14M_s43 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-14M_s43 --split val --lengths 128 256 512 1024
+[2026-10-17 17:01:22] finished val:v6-AL-14M_s42 on GPU 3: rc=0, complete=True, 3.7 min
+[2026-10-17 17:01:22] started val:v6-AL-3M_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-3M_s44 --split val --lengths 128 256 512 1024
+[2026-10-17 17:03:18] finished val:v6-AL-3M_s44 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 17:03:18] started val:v6-AL-14M_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-14M_s44 --split val --lengths 128 256 512 1024
+[2026-10-17 17:04:52] finished val:v6-AL-14M_s43 on GPU 2: rc=0, complete=True, 3.7 min
+[2026-10-17 17:04:52] started test:v6-AL-3M_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-3M_s42 --split test --lengths 128 256 512 1024
+[2026-10-17 17:06:48] finished test:v6-AL-3M_s42 on GPU 2: rc=0, complete=True, 1.9 min
+[2026-10-17 17:06:48] started test:v6-AL-14M_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-14M_s42 --split test --lengths 128 256 512 1024
+[2026-10-17 17:06:58] finished val:v6-AL-14M_s44 on GPU 3: rc=0, complete=True, 3.7 min
+[2026-10-17 17:06:59] started test:v6-AL-3M_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-3M_s43 --split test --lengths 128 256 512 1024
+[2026-10-17 17:08:56] finished test:v6-AL-3M_s43 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 17:08:56] started test:v6-AL-14M_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-14M_s43 --split test --lengths 128 256 512 1024
+[2026-10-17 17:10:50] finished test:v6-AL-14M_s42 on GPU 2: rc=0, complete=True, 4.0 min
+[2026-10-17 17:10:51] started test:v6-AL-3M_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-3M_s44 --split test --lengths 128 256 512 1024
+[2026-10-17 17:12:46] finished test:v6-AL-3M_s44 on GPU 2: rc=0, complete=True, 1.9 min
+[2026-10-17 17:12:46] started test:v6-AL-14M_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run v6-AL-14M_s44 --split test --lengths 128 256 512 1024
+[2026-10-17 17:12:56] finished test:v6-AL-14M_s43 on GPU 3: rc=0, complete=True, 4.0 min
+[2026-10-17 17:12:56] started errors:v6-AL-3M_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run v6-AL-3M_s42 --length 512
+[2026-10-17 17:13:28] finished errors:v6-AL-3M_s42 on GPU 3: rc=0, complete=True, 0.5 min
+[2026-10-17 17:13:28] started errors:v6-AL-14M_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run v6-AL-14M_s42 --length 512
+[2026-10-17 17:14:30] finished errors:v6-AL-14M_s42 on GPU 3: rc=0, complete=True, 1.0 min
+[2026-10-17 17:14:30] started errors:v6-AL-3M_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run v6-AL-3M_s43 --length 512
+[2026-10-17 17:15:02] finished errors:v6-AL-3M_s43 on GPU 3: rc=0, complete=True, 0.5 min
+[2026-10-17 17:15:02] started errors:v6-AL-14M_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run v6-AL-14M_s43 --length 512
+[2026-10-17 17:15:54] finished errors:v6-AL-14M_s43 on GPU 3: rc=0, complete=True, 0.9 min
+[2026-10-17 17:15:54] started errors:v6-AL-3M_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run v6-AL-3M_s44 --length 512
+[2026-10-17 17:16:25] finished errors:v6-AL-3M_s44 on GPU 3: rc=0, complete=True, 0.5 min
+[2026-10-17 17:16:25] started errors:v6-AL-14M_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run v6-AL-14M_s44 --length 512
+[2026-10-17 17:16:46] finished test:v6-AL-14M_s44 on GPU 2: rc=0, complete=True, 4.0 min
+[2026-10-17 17:16:46] started errors:ft4k-alibi512_lr3e-5_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run ft4k-alibi512_lr3e-5_s42 --length 512
+[2026-10-17 17:17:17] finished errors:v6-AL-14M_s44 on GPU 3: rc=0, complete=True, 0.9 min
+[2026-10-17 17:17:17] finished errors:ft4k-alibi512_lr3e-5_s42 on GPU 2: rc=0, complete=True, 0.5 min
+[2026-10-17 17:17:17] started errors:ft4k-alibi512_lr3e-5_s43 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run ft4k-alibi512_lr3e-5_s43 --length 512
+[2026-10-17 17:17:17] started errors:ft4k-alibi512_lr3e-5_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run ft4k-alibi512_lr3e-5_s44 --length 512
+[2026-10-17 17:17:49] finished errors:ft4k-alibi512_lr3e-5_s43 on GPU 2: rc=0, complete=True, 0.5 min
+[2026-10-17 17:17:49] finished errors:ft4k-alibi512_lr3e-5_s44 on GPU 3: rc=0, complete=True, 0.5 min
+[2026-10-17 17:17:49] started errors:ft4k-long512_lr3e-4_s42 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run ft4k-long512_lr3e-4_s42 --length 512
+[2026-10-17 17:17:49] started errors:ft4k-long512_lr3e-4_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run ft4k-long512_lr3e-4_s43 --length 512
+[2026-10-17 17:18:20] finished errors:ft4k-long512_lr3e-4_s42 on GPU 2: rc=0, complete=True, 0.5 min
+[2026-10-17 17:18:20] finished errors:ft4k-long512_lr3e-4_s43 on GPU 3: rc=0, complete=True, 0.5 min
+[2026-10-17 17:18:20] started errors:ft4k-long512_lr3e-4_s44 on GPU 2: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/analyze_errors.py --run ft4k-long512_lr3e-4_s44 --length 512
+[2026-10-17 17:18:51] finished errors:ft4k-long512_lr3e-4_s44 on GPU 2: rc=0, complete=True, 0.5 min
+[2026-10-17 17:19:01] queue empty; failed: []

@@ -1,0 +1,1878 @@
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index 706286b..f37aee9 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -31,10 +31,12 @@ repos:
+         exclude: ^data/
+       - id: end-of-file-fixer
+         stages: [pre-commit]
+-        exclude: ^data/
++        # results/v6/code/: verbatim git diffs, whose whitespace must stay as it is
++        exclude: ^(data/|results/v6/code/)
+       - id: trailing-whitespace
+         stages: [pre-commit]
+-        exclude: ^data/
++        # results/v6/code/: verbatim git diffs, whose whitespace must stay as it is
++        exclude: ^(data/|results/v6/code/)
+ 
+   # --- Custom hooks for full repo checks ---
+   - repo: local
+diff --git a/results/README.md b/results/README.md
+index 164b25d..e269e00 100644
+--- a/results/README.md
++++ b/results/README.md
+@@ -5,6 +5,7 @@ final configuration was reached and are kept for traceability; their numbers are
+ 
+ | folder | status | what it holds |
+ |---|---|---|
++| [`v6/`](v6/REPORT.md) | current (follow-up, not in the report yet) | Capacity study: ALiBi 3.2M vs 14.2M trained from scratch on 512-character windows (819M training characters, checkpoints selected by validation accuracy), Acc_all / Top-k of the best v5 models. `aggregate_v6.py` rebuilds its tables and figures from `v6/raw/` (+ `v5/raw/`, `v3/raw/`); `code/` holds the code snapshots (HEAD + uncommitted diff) taken at every launch. |
+ | [`v5/`](v5/REPORT.md) | current (follow-up, not in the report yet) | Fixing RoPE beyond its training length: evaluation-only variants (local attention, SelfExtend) and long-window fine-tuning with and without position interpolation, 1,000 and 4,000 iterations. `aggregate_v5.py` rebuilds its tables and figures from `v5/raw/` (+ `v3/raw/`, `v4/raw/` for reference rows). |
+ | [`v4/`](v4/REPORT.md) | **current** | Final tables and figures of the report: Transformer vs LSTMs, seven positional encodings (incl. NoPE), dropout, length extrapolation (incl. position interpolation), attention analysis, learning-rate bracket check. `aggregate_v4.py` rebuilds everything; `claims.md` traces every number in the report to a file. |
+ | [`v3/`](v3/REPORT.md) | current raw data, superseded tables | The 36 final 50k-iteration runs (3 seeds each), extrapolation and attention evaluations. `v3/raw/` is read by `v4/aggregate_v4.py`; `v3/tables` and `v3/figures` use the old model names (TR, LR-1, LR-2). |
+diff --git a/scripts/eval_extrapolation.py b/scripts/eval_extrapolation.py
+index 4e5192c..323f143 100644
+--- a/scripts/eval_extrapolation.py
++++ b/scripts/eval_extrapolation.py
+@@ -9,7 +9,9 @@ non-overlapping chunks (seed 0). learned / hybrid beyond their training length a
+ --interpolate uses position interpolation (rope / sinusoidal only, no fine-tuning): pos_scale = L / W for each W,
+ and writes runs/<run>/extrapolation_pi.json instead (the plain results are never overwritten).
+ The evaluation batch size starts at --batch-size and is lowered for large W so the estimate stays below --budget-gib.
+-Writes runs/<run>/extrapolation.json (checkpoint best_loss_all_).
++Writes runs/<run>/extrapolation.json for the run's selected checkpoint (train.selected_checkpoint: best_loss_all_
++unless the run was trained with training.checkpoint_selection=acc); --checkpoint PREFIX scores another one.
++--tag NAME appends _NAME to the output name, e.g. to re-evaluate a run without overwriting an earlier result.
+ 
+     python scripts/eval_extrapolation.py --run TR-final_s42 --lengths 256 512 1024 --interpolate
+ 
+@@ -51,18 +53,26 @@ from utils.full_context_eval import frequency_groups  # noqa: E402
+ DROP = ("ece_bins", "class_count", "class_correct")
+ 
+ 
+-def load_run(run):
+-    run_dir = ROOT / "runs" / run
++def checkpoint_prefix(config, checkpoint=None):
++    """`checkpoint` (a prefix of train.CHECKPOINT_TYPES), or the run's selected checkpoint when None."""
++    return train.selected_checkpoint(config)[0] if checkpoint is None else checkpoint
++
++
++def load_run(run, checkpoint=None, runs_dir=ROOT / "runs"):
++    """(run_dir, config, checkpoint dict) of `run`; checkpoint: a prefix of train.CHECKPOINT_TYPES (default: the
++    run's selected checkpoint)."""
++    run_dir = Path(runs_dir) / run
+     config = train.resolve_config(load_config(run_dir / "config.yaml"))
+     _, stage_dir, best_dir = train.run_paths(config, run)
+-    ckpt = load_checkpoint("best_loss_all_", "Best Loss", best_dir, stage_dir)
++    prefix = checkpoint_prefix(config, checkpoint)
++    ckpt = load_checkpoint(prefix, dict(train.CHECKPOINT_TYPES)[prefix], best_dir, stage_dir)
+     if ckpt is None:
+-        raise FileNotFoundError(f"no best_loss_all_ checkpoint for {run}")
++        raise FileNotFoundError(f"no {prefix} checkpoint for {run}")
+     return run_dir, config, ckpt
+ 
+ 
+ def output_name(args):
+-    """extrapolation[_pi][_local<N>][_se<mode><N>][_val].json"""
++    """extrapolation[_pi][_local<N>][_se<mode><N>][_val][_<tag>].json"""
+     parts = ["extrapolation"]
+     if args.interpolate:
+         parts.append("pi")
+@@ -72,6 +82,8 @@ def output_name(args):
+         parts.append(f"se{args.self_extend_mode}{args.self_extend}")
+     if args.split == "val":
+         parts.append("val")
++    if args.tag:
++        parts.append(args.tag)
+     return "_".join(parts) + ".json"
+ 
+ 
+@@ -90,12 +102,15 @@ def main(argv=None):
+     ap.add_argument("--self-extend-mode", choices=["floor", "linear"], default="floor")
+     ap.add_argument("--stride1", type=int, nargs="*", default=[], help="also sliding-window BPC with stride 1 at these W")
+     ap.add_argument("--split", choices=["test", "val"], default="test", help="val: score the validation split (test never opened)")
++    ap.add_argument("--checkpoint", default=None, choices=[p for p, _ in train.CHECKPOINT_TYPES],
++                    help="checkpoint to score (default: the run's selected checkpoint)")
++    ap.add_argument("--tag", default="", help="suffix of the output file name")
+     ap.add_argument("--data-dir", default=str(ROOT / "data"))
+     args = ap.parse_args(argv)
+     if args.sanity and args.split != "test":
+         raise SystemExit("--sanity compares with eval.json, which is a test-set result: use --split test")
+ 
+-    run_dir, config, ckpt = load_run(args.run)
++    run_dir, config, ckpt = load_run(args.run, args.checkpoint)
+     out_file = run_dir / output_name(args)
+     params = ckpt["params"]
+     train_int, val_int, test_int = train.load_data(args.data_dir, include_test=args.split == "test")
+@@ -105,7 +120,7 @@ def main(argv=None):
+     self_extend = (args.self_extend, args.self_extend_mode) if args.self_extend else None
+     variant = {"interpolate": bool(args.interpolate), "attn_window": args.local_window,
+                "self_extend": list(self_extend) if self_extend else None}
+-    out = {"run": args.run, "checkpoint": "best_loss_all_", "step": int(ckpt["step"]), "train_len": L,
++    out = {"run": args.run, "checkpoint": checkpoint_prefix(config, args.checkpoint), "step": int(ckpt["step"]), "train_len": L,
+            "model_type": config.model.type, "pos_encoding_type": getattr(config.model, "pos_encoding_type", None),
+            "model_pos_scale": float(getattr(config.model, "pos_scale", 1.0)), "split": args.split,
+            "n_chars": len(eval_int), "stride": args.stride, "n_chunks": args.n_chunks, "device": jax.devices()[0].device_kind,
+@@ -124,7 +139,7 @@ def main(argv=None):
+         return {k: v for k, v in fc.items() if k not in DROP}
+ 
+     if args.sanity:
+-        ref = json.load(open(run_dir / "eval.json"))["checkpoints"]["best_loss_all_"]["full_context"]
++        ref = json.load(open(run_dir / "eval.json"))["checkpoints"][out["checkpoint"]]["full_context"]
+         fc = fc_eval(rebuild_for_length(config, L, train.build_model), L, 1)
+         diff = fc["bpc"] - ref["bpc"]
+         out["sanity"] = {"window": L, "stride": 1, "bpc": fc["bpc"], "eval_json_bpc": ref["bpc"], "diff": diff,
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 7f178a4..9f995b3 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -161,3 +161,75 @@ def test_init_from_rejects_other_shapes(tiny_run):
+     train.main(common + ["--run-name", "src"])
+     with pytest.raises(ValueError, match="parameter shapes"):
+         train.main(common + ["--run-name", "ft", "--init-from", "src", "--set", "model.d_model=32"])
++
++
++# ----------------------------------------------------------------------------------------------
++# training.checkpoint_selection=acc: select on validation accuracy, ties broken by the lower validation loss
++# ----------------------------------------------------------------------------------------------
++def _expected_acc_bpc_step(run_dir):
++    """Iteration of the earliest validation check with the highest (accuracy, -loss)."""
++    hist = json.load(open(run_dir / "metrics_history.json"))
++    keys = [(a, -loss) for a, loss in zip(hist["acc"], hist["loss_all_val"])]
++    return hist["iteration"][max(range(len(keys)), key=keys.__getitem__)]
++
++
++def test_acc_selection_saves_and_scores_the_best_accuracy_checkpoint(tiny_run):
++    from utils import load_checkpoint
++
++    tmp_path, data_dir, cfg_path = tiny_run
++    train.main(["--config", str(cfg_path), "--seed", "3", "--tuning", "--data-dir", str(data_dir),
++                "--set", "evaluation.tuning_val_stride=4", "--set", "training.checkpoint_selection=acc",
++                "--set", "training.epochs=12"])
++    run_dir = tmp_path / "runs" / "tiny_s3"
++    step = _expected_acc_bpc_step(run_dir)
++    d = tmp_path / "ckpt" / "tiny_s3"
++    assert load_checkpoint("best_acc_bpc_", "Best Accuracy (BPC tie-break)", d / "best", d / "stage")["step"] == step
++
++    out = json.load(open(run_dir / "val_eval.json"))
++    assert out["selected_checkpoint"] == "best_acc_bpc_"
++    assert out["checkpoints"]["best_acc_bpc_"]["step"] == step
++    val_len = len(train.load_data(data_dir, include_test=False)[1])
++    for prefix in ("best_acc_bpc_", "best_loss_all_"):  # the best-loss checkpoint is scored too, as a reference
++        assert out["checkpoints"][prefix]["full_context"]["n_scored"] == val_len - 1
++
++    timing = json.load(open(run_dir / "timing.json"))
++    assert timing["train_tokens"] == 12 * 4 * 16 and timing["updates"] == 12
++
++
++def test_loss_selection_saves_no_accuracy_bpc_checkpoint(tiny_run):
++    tmp_path, data_dir, cfg_path = tiny_run
++    train.main(["--config", str(cfg_path), "--seed", "3", "--tuning", "--data-dir", str(data_dir),
++                "--set", "evaluation.tuning_val_stride=4"])
++    assert not list((tmp_path / "ckpt" / "tiny_s3" / "best").glob("best_acc_bpc_*"))
++    out = json.load(open(tmp_path / "runs" / "tiny_s3" / "val_eval.json"))
++    assert out["selected_checkpoint"] == "best_loss_all_" and list(out["checkpoints"]) == ["best_loss_all_"]
++
++
++@pytest.mark.parametrize("selection,full", [("loss", "best_loss_all_"), ("acc", "best_acc_bpc_")])
++def test_test_evaluation_runs_every_mode_on_the_selected_checkpoint(tiny_run, selection, full):
++    tmp_path, data_dir, cfg_path = tiny_run
++    # (max_len 32: the legacy32 test mode scores 32-character blocks)
++    train.main(["--config", str(cfg_path), "--seed", "3", "--data-dir", str(data_dir),
++                "--set", f"training.checkpoint_selection={selection}", "--set", "evaluation.full_context_stride=8",
++                "--set", "model.max_len=32", "--set", "training.sequence_length=32"])
++    out = json.load(open(tmp_path / "runs" / "tiny_s3" / "eval.json"))
++    assert [p for p, e in out["checkpoints"].items() if "full_context" in e] == [full]
++    assert out["selected_checkpoint"] == full
++
++
++def test_eval_tools_load_the_selected_checkpoint(tiny_run):
++    import sys
++
++    sys.path.insert(0, str(train.REPO_ROOT / "scripts"))
++    from eval_extrapolation import load_run
++
++    tmp_path, data_dir, cfg_path = tiny_run
++    train.main(["--config", str(cfg_path), "--seed", "3", "--tuning", "--data-dir", str(data_dir),
++                "--set", "evaluation.tuning_val_stride=4", "--set", "training.checkpoint_selection=acc",
++                "--set", "training.epochs=12"])
++    run_dir = tmp_path / "runs" / "tiny_s3"
++    out = json.load(open(run_dir / "val_eval.json"))["checkpoints"]
++    _, _, ckpt = load_run("tiny_s3", runs_dir=tmp_path / "runs")
++    assert ckpt["step"] == out["best_acc_bpc_"]["step"] == _expected_acc_bpc_step(run_dir)
++    _, _, ckpt = load_run("tiny_s3", checkpoint="best_loss_all_", runs_dir=tmp_path / "runs")
++    assert ckpt["step"] == out["best_loss_all_"]["step"]
+diff --git a/tests/test_full_context_eval.py b/tests/test_full_context_eval.py
+index 5b5a974..12cd427 100644
+--- a/tests/test_full_context_eval.py
++++ b/tests/test_full_context_eval.py
+@@ -76,6 +76,17 @@ def test_stride1_matches_brute_force(setup):
+         assert out[key] == pytest.approx(correct[sel].mean(), abs=1e-12)
+ 
+ 
++def test_top_k_accuracy_matches_brute_force(setup):
++    model, params, data = setup
++    out = full_context_eval(model, params, data, window=W, stride=1, batch_size=8, verbose=False)
++    contexts = [(t, max(0, t - W)) for t in range(1, N)]
++    _, logits, targets = _brute_force(model, params, data, contexts)
++    rank = (logits > logits[np.arange(len(targets)), targets][:, None]).sum(-1)  # characters scored above the target
++    for k in (2, 3, 5):
++        assert out[f"acc_top{k}"] == pytest.approx((rank < k).mean(), abs=1e-12)
++    assert out["acc"] <= out["acc_top2"] <= out["acc_top3"] <= out["acc_top5"]
++
++
+ def test_stride7_matches_its_window_plan(setup):
+     model, params, data = setup
+     stride = 7
+diff --git a/tests/test_long_context.py b/tests/test_long_context.py
+index 363e4e7..30b6964 100644
+--- a/tests/test_long_context.py
++++ b/tests/test_long_context.py
+@@ -216,10 +216,12 @@ def test_older_configs_get_pos_scale_one():
+     ({"interpolate": True}, "extrapolation_pi.json"),
+     ({"local_window": 64}, "extrapolation_local64.json"),
+     ({"self_extend": 32, "self_extend_mode": "linear", "split": "val"}, "extrapolation_selinear32_val.json"),
++    ({"tag": "v6"}, "extrapolation_v6.json"),
++    ({"split": "val", "tag": "v6"}, "extrapolation_val_v6.json"),
+ ])
+ def test_output_names(kw, name):
+     args = argparse.Namespace(**{"interpolate": False, "local_window": 0, "self_extend": 0, "self_extend_mode": "floor",
+-                                 "split": "test", **kw})
++                                 "split": "test", "tag": "", **kw})
+     assert output_name(args) == name
+ 
+ 
+diff --git a/train.py b/train.py
+index 29edc09..38b6c4d 100644
+--- a/train.py
++++ b/train.py
+@@ -12,6 +12,9 @@ best-loss checkpoint is then scored with full-context evaluation on the validati
+ (stride evaluation.tuning_val_stride) into val_eval.json; no test metrics, samples or Self-BLEU.
+ --init-from RUN starts from the parameters of RUN's best_loss_all_ checkpoint instead of a fresh initialisation
+ (fine-tuning; the optimizer state and the LR schedule start fresh); the model must have the same parameter shapes.
++training.checkpoint_selection picks the checkpoint that --tuning and the full test evaluation score: 'loss' (default,
++best_loss_all_: lowest fixed-validation loss) or 'acc' (best_acc_bpc_: highest fixed-validation accuracy, ties broken
++by the lower loss, i.e. the lower BPC; saved only in this mode).
+ --epochs / --val-interval / --fc-stride are for smoke tests only. --eval-only re-runs the final
+ evaluation from the checkpoints of an existing run. GPU selection comes from CUDA_VISIBLE_DEVICES.
+ 
+@@ -31,7 +34,8 @@ Intentional differences from the original course notebook (results/code_changes_
+     single-prompt and multi-prompt Self-BLEU.
+ Additions not in the notebook: pos_encoding_type 'none' (NoPE), the evaluation-only model options used by
+ utils/extrapolation_eval.py and scripts/analyze_attention.py (capture_attn, rel_clamp, pos_scale, attn_window,
+-self_extend_*), model.pos_scale (position interpolation in training, default 1.0) and --init-from (fine-tuning).
++self_extend_*), model.pos_scale (position interpolation in training, default 1.0), --init-from (fine-tuning) and
++training.checkpoint_selection (selection by validation accuracy).
+ """
+ 
+ import argparse
+@@ -82,15 +86,19 @@ VAL_SET_SEED = 0
+ VAL_ATTN_BUDGET = VAL_SET_SIZE * 128 * 128
+ TIMING_WINDOW = (1000, 2000)
+ 
+-# Evaluated checkpoints: (on-disk prefix, name, run every evaluation mode?)
++# Evaluated checkpoints: (on-disk prefix, name); every evaluation mode runs on the selected one (selected_checkpoint)
+ CHECKPOINT_TYPES = [
+-    ("best_loss_all_", "Best Loss", True),
+-    ("best_acc_total_", "Best Accuracy", False),
+-    ("best_acc_last_", "Best Last-Char Accuracy", False),
++    ("best_loss_all_", "Best Loss"),
++    ("best_acc_total_", "Best Accuracy"),
++    ("best_acc_last_", "Best Last-Char Accuracy"),
++    ("best_acc_bpc_", "Best Accuracy (BPC tie-break)"),  # saved only with training.checkpoint_selection = acc
+ ]
++# training.checkpoint_selection -> the checkpoint that --tuning and the full test evaluation score
++CHECKPOINT_SELECTIONS = {"loss": CHECKPOINT_TYPES[0], "acc": CHECKPOINT_TYPES[3]}
+ 
+ DEFAULTS = {
+     "model": {"type": "transformer"},
++    "training": {"checkpoint_selection": "loss"},
+     # Values previously hard-coded in the notebook, plus the decay mask switch.
+     "optimizer": {"b1": 0.9, "b2": 0.95, "eps": 1e-8, "weight_decay": 0.1, "grad_clip_norm": 1.0, "decay_mask": True},
+     "evaluation": {
+@@ -256,6 +264,15 @@ def build_model(config, **eval_options):
+     raise ValueError(f"Unknown model.type: {m.type}")
+ 
+ 
++def selected_checkpoint(config):
++    """(prefix, name) of the checkpoint chosen by training.checkpoint_selection: 'loss' = lowest fixed-validation loss,
++    'acc' = highest fixed-validation accuracy, ties broken by the lower loss."""
++    selection = getattr(config.training, "checkpoint_selection", DEFAULTS["training"]["checkpoint_selection"])
++    if selection not in CHECKPOINT_SELECTIONS:
++        raise ValueError(f"training.checkpoint_selection must be one of {sorted(CHECKPOINT_SELECTIONS)}, got {selection!r}")
++    return CHECKPOINT_SELECTIONS[selection]
++
++
+ def init_params(model, config, key):
+     dummy = jnp.zeros((1, min(16, config.model.max_len)), dtype=jnp.int32)
+     return model.init({"params": key}, dummy, deterministic=True)["params"]
+@@ -537,6 +554,7 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
+     T = config.training.sequence_length
+     epochs = config.training.epochs
+     val_interval = config.training.validation_interval
++    select_acc = selected_checkpoint(config)[0] == "best_acc_bpc_"
+ 
+     init_key, dropout_key = jax.random.split(jax.random.PRNGKey(seed))
+     np_rng = np.random.default_rng(seed)
+@@ -615,6 +633,9 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
+             if is_best_acc_last:
+                 checkpoints_to_save["best_acc_last"] = (it, checkpoint_state.copy())
+                 print(f"\t \t Saving best last-character accuracy checkpoint at iteration {it}...")
++            if select_acc and metrics_logger.last_is_best_acc_bpc():
++                checkpoints_to_save["best_acc_bpc"] = (it, checkpoint_state.copy())
++                print(f"\t \t Saving best accuracy (BPC tie-break) checkpoint at iteration {it}...")
+ 
+     total_time = time.time() - time_start
+ 
+@@ -650,6 +671,8 @@ def train(config, model, data, seed, legacy_dropout_rng, run_dir, stage_dir, bes
+         "total_train_time_s": float(total_time),
+         "batch_size": B,
+         "sequence_length": T,
++        "updates": int(epochs),
++        "train_tokens": int(epochs) * B * T,
+         "device": jax.devices()[0].device_kind,
+         "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+         "peak_device_memory_gib_training": peak_memory_gib(),
+@@ -769,8 +792,10 @@ def evaluate(config, model, data, run_dir, stage_dir, best_dir, meta):
+     timing_path = run_dir / "timing.json"
+     results["throughput"] = json.load(open(timing_path)) if timing_path.exists() else None
+     results["checkpoints"] = {}
++    results["selected_checkpoint"], _ = selected_checkpoint(config)
+ 
+-    for prefix, name, full in CHECKPOINT_TYPES:
++    for prefix, name in CHECKPOINT_TYPES:
++        full = prefix == results["selected_checkpoint"]
+         print(f"\n{name} ({prefix})...")
+         checkpoint = load_checkpoint(prefix, name, best_dir, stage_dir)
+         if checkpoint is None:
+@@ -821,8 +846,9 @@ def evaluate(config, model, data, run_dir, stage_dir, best_dir, meta):
+ 
+ 
+ def evaluate_tuning(config, model, data, run_dir, stage_dir, best_dir, meta):
+-    """--tuning: score the best-loss checkpoint with full-context evaluation on the validation split.
+-    Never touches the test split (data[2] is None) and writes no samples or Self-BLEU."""
++    """--tuning: score the selected checkpoint (and the best-loss one, if that is a different checkpoint type) with
++    full-context evaluation on the validation split. Never touches the test split (data[2] is None) and writes no
++    samples or Self-BLEU."""
+     train_int, val_int, test_int = data
+     assert test_int is None, "tuning mode must not load the test split"
+     groups = frequency_groups(train_int, config.model.vocab_size, INT_TO_CHAR)
+@@ -832,26 +858,29 @@ def evaluate_tuning(config, model, data, run_dir, stage_dir, best_dir, meta):
+     timing_path = run_dir / "timing.json"
+     results["throughput"] = json.load(open(timing_path)) if timing_path.exists() else None
+ 
+-    prefix, name, _ = CHECKPOINT_TYPES[0]
+-    checkpoint = load_checkpoint(prefix, name, best_dir, stage_dir)
+-    if checkpoint is None:
+-        raise FileNotFoundError(f"no {prefix} checkpoint in {best_dir}")
+-    entry = {k: to_jsonable(checkpoint[k]) for k in
+-             ("step", "val_loss", "val_bpc", "val_perplexity", "val_acc", "val_acc_last", "ECE")}
+-    fc = full_context_eval(
+-        model, checkpoint["params"], val_int,
+-        window=config.model.max_len,
+-        stride=config.evaluation.tuning_val_stride,
+-        batch_size=config.evaluation.full_context_batch_size,
+-        vocab_size=config.model.vocab_size,
+-        rare_ids=groups["rare_ids"],
+-        common_ids=groups["common_ids"],
+-    )
+-    assert fc["n_scored"] == len(val_int) - 1, (fc["n_scored"], len(val_int) - 1)
+-    entry["full_context"] = fc
+-    print(f"\t validation full_context (W={fc['window']}, S={fc['stride']}, {fc['seconds']:.0f}s): BPC {fc['bpc']:.4f}, "
+-          f"acc {100 * fc['acc']:.2f}%, ECE {fc['ece']:.4f}")
+-    results["checkpoints"] = {prefix: entry}
++    selected = selected_checkpoint(config)
++    results["selected_checkpoint"] = selected[0]
++    results["checkpoints"] = {}
++    for prefix, name in dict([selected, CHECKPOINT_TYPES[0]]).items():
++        checkpoint = load_checkpoint(prefix, name, best_dir, stage_dir)
++        if checkpoint is None:
++            raise FileNotFoundError(f"no {prefix} checkpoint in {best_dir}")
++        entry = {k: to_jsonable(checkpoint[k]) for k in
++                 ("step", "val_loss", "val_bpc", "val_perplexity", "val_acc", "val_acc_last", "ECE")}
++        fc = full_context_eval(
++            model, checkpoint["params"], val_int,
++            window=config.model.max_len,
++            stride=config.evaluation.tuning_val_stride,
++            batch_size=config.evaluation.full_context_batch_size,
++            vocab_size=config.model.vocab_size,
++            rare_ids=groups["rare_ids"],
++            common_ids=groups["common_ids"],
++        )
++        assert fc["n_scored"] == len(val_int) - 1, (fc["n_scored"], len(val_int) - 1)
++        entry["full_context"] = fc
++        print(f"\t {name} (step {entry['step']}): validation full_context (W={fc['window']}, S={fc['stride']}, "
++              f"{fc['seconds']:.0f}s): BPC {fc['bpc']:.4f}, acc {100 * fc['acc']:.2f}%, ECE {fc['ece']:.4f}")
++        results["checkpoints"][prefix] = entry
+     results["peak_device_memory_gib"] = peak_memory_gib()
+     with open(run_dir / "val_eval.json", "w") as f:
+         json.dump(to_jsonable(results), f, indent=2)
+diff --git a/utils/checkpoint_saver.py b/utils/checkpoint_saver.py
+index ab85b43..6acc2e4 100644
+--- a/utils/checkpoint_saver.py
++++ b/utils/checkpoint_saver.py
+@@ -63,6 +63,20 @@ def save_collected_checkpoints(checkpoints_to_save, stage_dir, best_dir):
+         )
+         print(f"\t Saved (acc_last: {100*ckpt_state['val_acc_last']:.2f}%)")
+ 
++    # save best accuracy checkpoint with the loss tie-break (training.checkpoint_selection = acc only)
++    if checkpoints_to_save.get('best_acc_bpc') is not None:
++        step, ckpt_state = checkpoints_to_save['best_acc_bpc']
++        print(f"\t Saving best accuracy (BPC tie-break) checkpoint (step {step:,})...")
++        checkpoints.save_checkpoint(
++            ckpt_dir=str(best_dir),
++            target=ckpt_state,
++            step=step,
++            prefix='best_acc_bpc_',
++            keep=1,
++            overwrite=True,
++        )
++        print(f"\t Saved (acc: {100*ckpt_state['val_acc']:.2f}%, bpc: {ckpt_state['val_bpc']:.4f})")
++
+     print("ALL CHECKPOINTS SAVED")
+ 
+ 
+diff --git a/utils/full_context_eval.py b/utils/full_context_eval.py
+index 02a5c21..7b51650 100644
+--- a/utils/full_context_eval.py
++++ b/utils/full_context_eval.py
+@@ -15,6 +15,10 @@ and both model types see the same context.
+ 
+ Windows are built on device from index arithmetic, batch by batch; the last batch is
+ padded to the fixed shape (padded windows score nothing), so the forward pass compiles once.
++
++Accuracy: `acc` is top-1 (argmax == target); `acc_top{k}` (k in TOP_K) counts a target as correct when fewer
++than k characters get a strictly higher logit than it; `acc_rare` / `acc_common` are top-1 on the rare / common
++character subsets (frequency_groups).
+ """
+ 
+ import math
+@@ -24,6 +28,8 @@ import jax
+ import jax.numpy as jnp
+ import numpy as np
+ 
++TOP_K = (2, 3, 5)
++
+ 
+ def num_windows(n_chars, window, stride):
+     if not 1 <= stride <= window:
+@@ -94,6 +100,8 @@ def make_eval_batch_fn(model, n_chars, window, stride, batch_size, vocab_size, n
+         nll = -jnp.take_along_axis(logp, y[..., None], axis=-1)[..., 0]
+         conf = jnp.exp(jnp.max(logp, axis=-1))
+         correct = (jnp.argmax(logits, axis=-1) == y).astype(jnp.float32)
++        # characters with a strictly higher logit than the target's
++        rank = jnp.sum(logits > jnp.take_along_axis(logits, y[..., None], axis=-1), axis=-1)
+ 
+         bins = jnp.digitize(conf, inner_edges).reshape(-1)
+         mf, cf, conf_f, yf = m.reshape(-1), correct.reshape(-1), conf.reshape(-1), y.reshape(-1)
+@@ -101,6 +109,7 @@ def make_eval_batch_fn(model, n_chars, window, stride, batch_size, vocab_size, n
+             "nll_sum": jnp.sum(nll * m),
+             "n_scored": jnp.sum(scored.astype(jnp.int32)),
+             "n_correct": jnp.sum((correct * m).astype(jnp.int32)),
++            **{f"n_correct_top{k}": jnp.sum(((rank < k) & scored).astype(jnp.int32)) for k in TOP_K},
+             "bin_count": jnp.zeros(n_bins, jnp.int32).at[bins].add(scored.reshape(-1).astype(jnp.int32)),
+             "bin_conf_sum": jnp.zeros(n_bins, jnp.float32).at[bins].add(conf_f * mf),
+             "bin_correct_sum": jnp.zeros(n_bins, jnp.int32).at[bins].add((cf * mf).astype(jnp.int32)),
+@@ -161,6 +170,7 @@ def full_context_eval(model, params, data_int, window, stride=1, batch_size=4096
+         "loss": float(mean_nll),
+         "perplexity": float(np.exp(mean_nll)),
+         "acc": float(totals["n_correct"] / n),
++        **{f"acc_top{k}": float(totals[f"n_correct_top{k}"] / n) for k in TOP_K},
+         "ece": ece,
+         "acc_rare": group_acc(rare_ids),
+         "acc_common": group_acc(common_ids),
+diff --git a/utils/logger.py b/utils/logger.py
+index ac19ea5..7f08324 100644
+--- a/utils/logger.py
++++ b/utils/logger.py
+@@ -60,6 +60,12 @@ class Logger:
+         is_best_acc_last = test_metrics['acc_last'] >= max(self.acc_last, default=float('-inf'))
+         return is_best_loss_all, is_best_acc, is_best_acc_last
+ 
++    def last_is_best_acc_bpc(self):
++        # Is the newest logged evaluation the best by accuracy, ties broken by the lower loss (= lower BPC on
++        # the same set)? Call after log_eval. An exact tie with an earlier evaluation keeps the earlier one.
++        keys = [(acc, -loss) for acc, loss in zip(self.acc, self.loss_all_val)]
++        return all(keys[-1] > k for k in keys[:-1])
++
+     def __repr__(self):
+         n_train = len(self.loss_weighted_train)
+         n_eval = len(self.iteration)
+diff --git a/results/v6/aggregate_v6.py b/results/v6/aggregate_v6.py
+new file mode 100644
+index 0000000..26ebaec
+--- /dev/null
++++ b/results/v6/aggregate_v6.py
+@@ -0,0 +1,660 @@
++"""
++Tables and figures of the v6 capacity study (results/v6/REPORT.md).
++
++    python results/v6/aggregate_v6.py            # tables (csv/md) and figures (pdf/png)
++    python results/v6/aggregate_v6.py --sync     # first copy the v6 outputs from runs/ into results/v6/raw/
++
++Reads results/v6/raw/ (this round) and, for the reference rows, results/v5/raw/ and results/v3/raw/ (never written).
++A per-run file is looked up in v6, then v5, v4, v3. Aggregates are mean ± sample std (ddof 1) over the seeds present;
++seed-matched differences are mean ± std of the per-seed differences.
++Test and validation numbers are sliding-window metrics (utils/full_context_eval.py) with stride 128: every target
++character of the split is scored exactly once, and every target after the first window sees >= W - 127 characters.
++Acc_all = top-1 (argmax == target) over all targets; Acc_common / Acc_rare = top-1 on the 5 most / least frequent
++training characters; Top-k = the target is among the k highest logits.
++"""
++
++import argparse
++import csv
++import json
++import re
++import shutil
++import statistics
++import sys
++from pathlib import Path
++
++import matplotlib
++
++matplotlib.use("Agg")
++import matplotlib.pyplot as plt  # noqa: E402
++import numpy as np  # noqa: E402
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++RAWS = [HERE / "raw"] + [ROOT / "results" / v / "raw" for v in ("v5", "v4", "v3")]
++TABLES, FIGS = HERE / "tables", HERE / "figures"
++sys.path.insert(0, str(ROOT / "scripts"))
++from launch_v6 import (  # noqa: E402
++    BRACKET_LR,
++    EXTRA_SEEDS,
++    FORMAL_ITERS,
++    FORMAL_SEED,
++    GAIN_RULE_PP,
++    LR_GRID,
++    MODELS,
++    SEARCH_ITERS,
++    SEARCH_SEED,
++    V5_RUNS,
++    formal_run,
++    search_run,
++)
++
++SEEDS = [FORMAL_SEED] + EXTRA_SEEDS
++LENGTHS = [128, 256, 512, 1024]
++MAIN_W = 512
++LN2 = np.log(2)
++TOKENS_PER_UPDATE = 16384
++TARGET_ACC = 80.0
++TRAIN_MEAN_EVERY = 100  # training loss is stored as means over this many iterations
++GAP_MARKS = [5000, 10000, 30000, FORMAL_ITERS - 1]  # iterations at which the validation - training gap is reported
++METRICS = [("bpc", "BPC", 4, 1), ("acc", "Acc_all (%)", 2, 100), ("acc_common", "Acc_common (%)", 2, 100),
++           ("acc_rare", "Acc_rare (%)", 2, 100), ("acc_top2", "Top-2 (%)", 2, 100), ("acc_top3", "Top-3 (%)", 2, 100),
++           ("acc_top5", "Top-5 (%)", 2, 100)]
++PARAMS = {"AL-3M": 3_169_280, "AL-14M": 14_204_928}
++
++INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
++COLORS = {"AL-3M": "#2a78d6", "AL-14M": "#eb6834", "v5-alibi": "#1baf7a", "v5-rope": "#eda100"}
++
++# test-set entities: key -> (label, run name of a seed, file with top-k, fallback file without top-k)
++ENTITIES = {
++    "AL-3M": ("ALiBi 3.2M, 512 from scratch (v6)", lambda s: formal_run("AL-3M", s), "extrapolation.json", None),
++    "AL-14M": ("ALiBi 14.2M, 512 from scratch (v6)", lambda s: formal_run("AL-14M", s), "extrapolation.json", None),
++    "v5-alibi": ("ALiBi 3.2M, 128 + 512-window FT 4k (v5 best)", lambda s: f"ft4k-alibi512_lr3e-5_s{s}",
++                 "extrapolation_v6.json", "extrapolation.json"),
++    "v5-rope": ("RoPE 3.2M, 128 + 512-window FT 4k, no PI (v5)", lambda s: f"ft4k-long512_lr3e-4_s{s}",
++                "extrapolation_v6.json", "extrapolation.json"),
++    "v3-alibi": ("ALiBi 3.2M, 128 only (v3)", lambda s: f"TR-final-alibi_s{s}", "extrapolation_v6.json", "extrapolation.json"),
++}
++
++
++# ---------------------------------------------------------------------------------------------- sync
++RUN_FILES = ["config.yaml", "val_eval.json", "timing.json", "training_results.json", "extrapolation.json", "extrapolation_val.json",
++             "errors_W512.json"]
++
++
++def sync():
++    raw = RAWS[0]
++    raw.mkdir(parents=True, exist_ok=True)
++    for run_dir in sorted((ROOT / "runs").iterdir()):
++        if not run_dir.is_dir():
++            continue
++        dst = raw / run_dir.name
++        if re.match(r"^v6(search)?-", run_dir.name):
++            if not (run_dir / "val_eval.json").exists():
++                continue
++            dst.mkdir(exist_ok=True)
++            for name in RUN_FILES:
++                if (run_dir / name).exists():
++                    shutil.copy2(run_dir / name, dst / name)
++            h = json.load(open(run_dir / "metrics_history.json"))
++            out = {k: h[k] for k in ("iteration", "loss_all_val", "acc", "bpc")}
++            tr = np.asarray(h["loss_all_train"], np.float64)
++            n = len(tr) // TRAIN_MEAN_EVERY * TRAIN_MEAN_EVERY
++            out["train_mean_every"] = TRAIN_MEAN_EVERY
++            out["train_loss_all_mean"] = [float(v) for v in tr[:n].reshape(-1, TRAIN_MEAN_EVERY).mean(1)]
++            (dst / "val_history.json").write_text(json.dumps(out))
++        elif run_dir.name in V5_RUNS:
++            for name in ("extrapolation_v6.json", "errors_W512.json"):
++                if (run_dir / name).exists():
++                    dst.mkdir(exist_ok=True)
++                    shutil.copy2(run_dir / name, dst / name)
++    for name in ("v6_status.jsonl", "launch_v6.txt", "launch_v6_b.txt"):
++        if (ROOT / "runs" / name).exists():
++            shutil.copy2(ROOT / "runs" / name, raw / name)
++    for p in raw.rglob("*"):  # end text files with a newline so pre-commit's end-of-file-fixer leaves them alone
++        if p.is_file() and p.suffix in (".json", ".jsonl", ".yaml", ".txt") and p.read_bytes()[-1:] != b"\n":
++            with open(p, "a") as f:
++                f.write("\n")
++
++
++# ---------------------------------------------------------------------------------------------- loading, statistics
++def load(run, fname):
++    for raw in RAWS:
++        if (raw / run / fname).exists():
++            return json.load(open(raw / run / fname))
++    return None
++
++
++def mean_std(xs):
++    xs = [x for x in xs if x is not None]
++    if not xs:
++        return None, None, 0
++    return statistics.mean(xs), (statistics.stdev(xs) if len(xs) > 1 else float("nan")), len(xs)
++
++
++def fmt(m, s=None, dec=4, signed=False):
++    if m is None:
++        return "n/a"
++    sign = "+" if signed else ""
++    if s is None or s != s:
++        return f"{m:{sign}.{dec}f}"
++    return f"{m:{sign}.{dec}f} ± {s:.{dec}f}"
++
++
++def sliding(run, fname, W):
++    x = load(run, fname)
++    if x is None or str(W) not in x["lengths"] or "na" in x["lengths"][str(W)]:
++        return None
++    return x["lengths"][str(W)]["sliding"]
++
++
++def entity_metric(key, W, metric, split="test"):
++    """{seed: value} of `metric` at window W."""
++    _, run_of, fname, fallback = ENTITIES[key]
++    if split == "val":
++        fname, fallback = "extrapolation_val.json", None
++    out = {}
++    for s in SEEDS:
++        e = sliding(run_of(s), fname, W)
++        if (e is None or metric not in e) and fallback:
++            e = sliding(run_of(s), fallback, W)
++        if e is not None and metric in e:
++            out[s] = e[metric]
++    return out
++
++
++def load_yaml(run):
++    import yaml
++
++    for raw in RAWS:
++        if (raw / run / "config.yaml").exists():
++            return yaml.safe_load(open(raw / run / "config.yaml"))
++    return None
++
++
++def selected_val(run):
++    """(acc, bpc, step, checkpoint) of the selected checkpoint on the whole validation split (val_eval.json)."""
++    e = load(run, "val_eval.json")
++    if e is None:
++        return None
++    prefix = e.get("selected_checkpoint", "best_loss_all_")
++    c = e["checkpoints"][prefix]
++    return c["full_context"]["acc"], c["full_context"]["bpc"], int(c["step"]), prefix
++
++
++def chosen_lr(model):
++    vals = {lr: selected_val(search_run(model, lr)) for lr in LR_GRID}
++    if any(v is None for v in vals.values()):
++        return None
++    return max(LR_GRID, key=lambda lr: (vals[lr][0], -vals[lr][1]))
++
++
++def paired(a, b):
++    """mean ± std of a[s] - b[s] over the common seeds, and the per-seed differences."""
++    d = {s: a[s] - b[s] for s in SEEDS if s in a and s in b}
++    m, sd, n = mean_std(list(d.values()))
++    return m, sd, n, d
++
++
++def status_records():
++    p = RAWS[0] / "v6_status.jsonl"
++    return [json.loads(line) for line in open(p)] if p.exists() else []
++
++
++# ---------------------------------------------------------------------------------------------- table writer
++def write_table(stem, header, rows, caption, notes="", csv_rows=None, csv_header=None):
++    TABLES.mkdir(parents=True, exist_ok=True)
++    md = ["| " + " | ".join(header) + " |", "|" + "|".join("---" for _ in header) + "|"]
++    md += ["| " + " | ".join(str(c) for c in r) + " |" for r in rows]
++    (TABLES / f"{stem}.md").write_text(f"{caption}\n\n" + "\n".join(md) + "\n" + (f"\n{notes}\n" if notes else ""))
++    with open(TABLES / f"{stem}.csv", "w", newline="") as f:
++        w = csv.writer(f)
++        w.writerow(csv_header or header)
++        w.writerows(csv_rows or rows)
++
++
++def pct(m, s=None, signed=False):
++    return fmt(None if m is None else 100 * m, None if s is None else 100 * s, 2, signed)
++
++
++# ---------------------------------------------------------------------------------------------- tables
++def write_reuse_check():
++    """The v6 re-evaluation of the v5 / v3 runs must reproduce their BPC and Acc_all (it only adds top-k)."""
++    rows, worst = [], {"bpc": 0.0, "acc": 0.0}
++    for run in V5_RUNS:
++        new, old = load(run, "extrapolation_v6.json"), load(run, "extrapolation.json")
++        if new is None or old is None:
++            continue
++        for W in LENGTHS:
++            a, b = new["lengths"][str(W)]["sliding"], old["lengths"][str(W)]["sliding"]
++            assert a["n_scored"] == b["n_scored"] == 4_999_999 and a["stride"] == b["stride"] == 128
++            d = {k: abs(a[k] - b[k]) for k in worst}
++            worst = {k: max(worst[k], d[k]) for k in worst}
++            rows.append([run, W, f"{b['bpc']:.6f}", f"{a['bpc']:.6f}", f"{100 * b['acc']:.4f}", f"{100 * a['acc']:.4f}",
++                         f"{d['bpc']:.1e}", f"{100 * d['acc']:.1e}"])
++    write_table("reuse_check", ["run", "W", "BPC (v5/v3 file)", "BPC (v6 re-eval)", "Acc (v5/v3)", "Acc (v6)", "|ΔBPC|", "|ΔAcc| (pp)"],
++                rows, "Re-evaluation of the v5 / v3 runs for top-k: BPC and Acc_all against the existing files (test, stride 128).",
++                f"Largest differences: BPC {worst['bpc']:.1e}, Acc_all {100 * worst['acc']:.1e} pp.")
++    return worst
++
++
++def write_metrics_at(W, keys, stem, caption, split="test"):
++    rows, csv_rows = [], []
++    for key in keys:
++        vals = [mean_std(list(entity_metric(key, W, m, split).values())) for m, *_ in METRICS]
++        if vals[0][0] is None:
++            continue
++        rows.append([ENTITIES[key][0], vals[0][2]] + [fmt(None if m is None else m * sc, None if s is None else s * sc, dec)
++                                                       for (m, s, _), (_, _, dec, sc) in zip(vals, METRICS)])
++        csv_rows.append([key, vals[0][2]] + [v[0] for v in vals] + [v[1] for v in vals])
++    write_table(stem, ["model", "seeds"] + [lab for _, lab, *_ in METRICS], rows, caption,
++                csv_rows=csv_rows, csv_header=["key", "n_seeds"] + [m for m, *_ in METRICS] + [f"{m}_std" for m, *_ in METRICS])
++    return rows
++
++
++def write_by_w(split="test"):
++    keys = ["AL-3M", "AL-14M"] + (["v5-alibi", "v5-rope", "v3-alibi"] if split == "test" else [])
++    rows, csv_rows = [], []
++    for key in keys:
++        for metric, lab, dec, sc in METRICS[:2]:
++            vals = [mean_std(list(entity_metric(key, W, metric, split).values())) for W in LENGTHS]
++            if all(v[0] is None for v in vals):
++                continue
++            rows.append([ENTITIES[key][0], lab] + [fmt(None if m is None else m * sc, None if s is None else s * sc, dec)
++                                                    for m, s, _ in vals])
++            csv_rows.append([key, metric] + [v[0] for v in vals] + [v[1] for v in vals] + [v[2] for v in vals])
++    write_table(f"{split}_by_W", ["model", "metric"] + [f"W={W}" for W in LENGTHS], rows,
++                f"{'Test' if split == 'test' else 'Validation'} BPC and Acc_all at each window (stride 128), mean ± std over seeds.",
++                csv_rows=csv_rows, csv_header=["key", "metric"] + [f"W{W}" for W in LENGTHS] + [f"W{W}_std" for W in LENGTHS]
++                + [f"W{W}_n" for W in LENGTHS])
++
++
++def write_search():
++    rows = []
++    for model in MODELS:
++        best = chosen_lr(model)
++        for lr in LR_GRID + [BRACKET_LR]:
++            v = selected_val(search_run(model, lr))
++            if v is None:
++                if lr != BRACKET_LR:
++                    rows.append([model, lr, "running", "", "", ""])
++                continue
++            acc, bpc, step, _ = v
++            loss_ckpt = load(search_run(model, lr), "val_eval.json")["checkpoints"]["best_loss_all_"]
++            mark = " ← chosen" if lr == best else " (post-hoc bracket check)" if lr == BRACKET_LR else ""
++            rows.append([model, lr + mark, f"{100 * acc:.3f}", f"{bpc:.4f}", step,
++                         f"{100 * loss_ckpt['full_context']['acc']:.3f}"])
++    write_table("search", ["model", "lr", "val Acc_all (%)", "val BPC", "selected step", "Acc_all of the best-loss checkpoint (%)"],
++                rows, f"Learning-rate search: {SEARCH_ITERS:,} iterations ({SEARCH_ITERS * TOKENS_PER_UPDATE / 1e6:.2f}M training "
++                f"characters), seed {SEARCH_SEED}, warmup 2,000, cosine to 0. Whole validation split, W = 512, stride 128, at the "
++                "checkpoint selected by fixed-validation accuracy (BPC tie-break). Chosen: highest val Acc_all, ties -> lower BPC.")
++
++
++def formal_val(model):
++    """{seed: (acc, bpc, step)}"""
++    out = {}
++    for s in SEEDS:
++        v = selected_val(formal_run(model, s))
++        if v is not None:
++            out[s] = v[:3]
++    return out
++
++
++def write_formal_val():
++    rows = []
++    v3, v14 = formal_val("AL-3M"), formal_val("AL-14M")
++    for s in SEEDS:
++        if s in v3 or s in v14:
++            a = v3.get(s, (None, None, None))
++            b = v14.get(s, (None, None, None))
++            rows.append([s, pct(a[0]), fmt(a[1]), a[2], pct(b[0]), fmt(b[1]), b[2],
++                         pct(b[0] - a[0], signed=True) if a[0] is not None and b[0] is not None else "",
++                         fmt(b[1] - a[1], signed=True) if a[1] is not None and b[1] is not None else ""])
++    accd = paired({s: v[0] for s, v in v14.items()}, {s: v[0] for s, v in v3.items()})
++    bpcd = paired({s: v[1] for s, v in v14.items()}, {s: v[1] for s, v in v3.items()})
++    if accd[2] > 1:
++        m3, s3, _ = mean_std([v[0] for v in v3.values()])
++        m14, s14, _ = mean_std([v[0] for v in v14.values()])
++        b3, sb3, _ = mean_std([v[1] for v in v3.values()])
++        b14, sb14, _ = mean_std([v[1] for v in v14.values()])
++        rows.append(["mean ± std", pct(m3, s3), fmt(b3, sb3), "", pct(m14, s14), fmt(b14, sb14), "",
++                     pct(accd[0], accd[1], True), fmt(bpcd[0], bpcd[1], signed=True)])
++    gain = None
++    if FORMAL_SEED in v3 and FORMAL_SEED in v14:
++        g = 100 * (v14[FORMAL_SEED][0] - v3[FORMAL_SEED][0])
++        gain = g >= GAIN_RULE_PP and v14[FORMAL_SEED][1] < v3[FORMAL_SEED][1]
++    note = (f"Rule for seeds 43 / 44 (fixed before the formal runs): seed-42 AL-14M − AL-3M validation Acc_all ≥ {GAIN_RULE_PP} pp "
++            f"and lower validation BPC. Seed 42: {'met' if gain else 'not met' if gain is not None else 'pending'}.")
++    write_table("formal_val", ["seed", "AL-3M val Acc_all (%)", "AL-3M val BPC", "step", "AL-14M val Acc_all (%)", "AL-14M val BPC",
++                               "step", "Δ Acc (pp)", "Δ BPC"], rows,
++                f"Formal runs ({FORMAL_ITERS:,} iterations, {FORMAL_ITERS * TOKENS_PER_UPDATE:,} training characters): whole "
++                "validation split, W = 512, stride 128, at the selected checkpoint.", note)
++    return gain, accd, bpcd
++
++
++def write_paired_test():
++    rows, csv_rows = [], []
++    for W in LENGTHS:
++        for metric, lab, dec, sc in METRICS:
++            m, sd, n, d = paired(entity_metric("AL-14M", W, metric), entity_metric("AL-3M", W, metric))
++            if not n:
++                continue
++            signs = "".join("+" if v > 0 else "−" if v < 0 else "0" for v in d.values())
++            rows.append([W, lab, fmt(None if m is None else m * sc, None if sd is None else sd * sc, dec, True), n,
++                         " / ".join(f"{v * sc:+.{dec}f}" for v in d.values()), signs])
++            csv_rows.append([W, metric, m, sd, n] + [d.get(s) for s in SEEDS])
++    write_table("paired_test", ["W", "metric", "AL-14M − AL-3M", "seeds", "per seed (42 / 43 / 44)", "signs"], rows,
++                "Seed-matched test differences AL-14M − AL-3M (stride 128).",
++                csv_rows=csv_rows, csv_header=["W", "metric", "mean", "std", "n"] + [f"s{s}" for s in SEEDS])
++
++
++def history(run):
++    return load(run, "val_history.json")
++
++
++def at_iteration(h, it, key):
++    i = h["iteration"].index(it) if it in h["iteration"] else None
++    return None if i is None else h[key][i]
++
++
++def train_bpc_near(h, it, span=1000):
++    """Mean training BPC (unweighted loss on the training batches) over the `span` iterations ending at `it`."""
++    k = TRAIN_MEAN_EVERY
++    tr = h["train_loss_all_mean"][max(0, (it + 1 - span) // k):(it + 1) // k]
++    return float(np.mean(tr) / LN2) if tr else None
++
++
++def write_curves():
++    """Fixed-validation-set trajectory and the train / validation gap of every formal run."""
++    marks = [5000, 10000, 20000, 30000, 40000, FORMAL_ITERS - 1]
++    rows, csv_rows = [], []
++    for model in MODELS:
++        for s in SEEDS:
++            h = history(formal_run(model, s))
++            if h is None:
++                continue
++            accs = [at_iteration(h, it, "acc") for it in marks]
++            bpcs = [at_iteration(h, it, "bpc") for it in marks]
++            gaps = [b - train_bpc_near(h, it) for it, b in zip(marks, bpcs)]
++            best_bpc_it = h["iteration"][int(np.argmin(h["bpc"]))]
++            rows.append([model, s] + [pct(a) for a in accs] + [fmt(bpcs[-1]), best_bpc_it]
++                        + [fmt(gaps[marks.index(it)], signed=True) for it in GAP_MARKS])
++            csv_rows.append([model, s] + accs + bpcs + [best_bpc_it] + gaps)
++    write_table("curves", ["model", "seed"] + [f"val Acc @ {it // 1000 if it % 1000 == 0 else round((it + 1) / 1000)}k (%)" for it in marks]
++                + ["val BPC @ 50k", "iteration of lowest val BPC"] + [f"val − train BPC @ {it // 1000}k" for it in GAP_MARKS[:-1]]
++                + ["val − train BPC @ 50k"], rows,
++                "Fixed validation set (1,024 windows × 512, all positions) during the formal runs. Train BPC = mean unweighted loss "
++                "on the training batches over the last 1,000 iterations (no dropout, so the same model as at validation). "
++                "Passes over the 85.5M-character training split: 0.96 at 5k iterations, 1.9 at 10k, 9.6 at 50k.",
++                csv_rows=csv_rows, csv_header=["model", "seed"] + [f"acc_{it}" for it in marks] + [f"bpc_{it}" for it in marks]
++                + ["best_bpc_iteration"] + [f"gap_{it}" for it in marks])
++
++
++def write_budget_scaling():
++    """2 x 2: model size x training characters (search run at the chosen lr = 10k iterations; formal seed 42 = 50k)."""
++    rows, cells = [], {}
++    for model in MODELS:
++        lr = chosen_lr(model)
++        short = selected_val(search_run(model, lr)) if lr else None
++        long = selected_val(formal_run(model, FORMAL_SEED))
++        cells[model] = (short, long)
++        rows.append([f"{model} ({PARAMS[model] / 1e6:.1f}M)", lr,
++                     pct(short[0]) if short else "n/a", fmt(short[1]) if short else "n/a",
++                     pct(long[0]) if long else "n/a", fmt(long[1]) if long else "n/a",
++                     pct(long[0] - short[0], signed=True) if short and long else "n/a"])
++    s3, l3 = cells["AL-3M"]
++    s14, l14 = cells["AL-14M"]
++    if s3 and s14:
++        rows.append(["AL-14M − AL-3M", "", pct(s14[0] - s3[0], signed=True), fmt(s14[1] - s3[1], signed=True),
++                     pct(l14[0] - l3[0], signed=True) if l3 and l14 else "n/a",
++                     fmt(l14[1] - l3[1], signed=True) if l3 and l14 else "n/a", ""])
++    short_m, long_m = SEARCH_ITERS * TOKENS_PER_UPDATE / 1e6, FORMAL_ITERS * TOKENS_PER_UPDATE / 1e6
++    write_table("budget_scaling", ["model", "lr", f"val Acc_all, {short_m:.0f}M chars (%)", "val BPC",
++                                   f"val Acc_all, {long_m:.0f}M chars (%)", "val BPC", "5× characters: Δ Acc (pp)"],
++                rows, "Model size × training characters, whole validation split (W = 512, stride 128), selected checkpoints. "
++                f"{short_m:.0f}M = the search run at the chosen lr (seed {SEARCH_SEED}, complete "
++                f"{SEARCH_ITERS:,}-iteration schedule); {long_m:.0f}M = the formal run, seed {FORMAL_SEED}.",
++                "The training split holds 85,500,000 characters, so 164M characters are 1.9 passes and 819M are 9.6 passes over it.")
++
++
++def write_selection():
++    """Accuracy-selected (best_acc_bpc_) vs loss-selected (best_loss_all_) checkpoint of every formal run."""
++    rows = []
++    for model in MODELS:
++        for s in SEEDS:
++            e = load(formal_run(model, s), "val_eval.json")
++            if e is None:
++                continue
++            a, b = e["checkpoints"]["best_acc_bpc_"], e["checkpoints"]["best_loss_all_"]
++            rows.append([formal_run(model, s), a["step"], b["step"], pct(a["val_acc"]), pct(b["val_acc"]),
++                         pct(a["full_context"]["acc"]), pct(b["full_context"]["acc"]), fmt(a["full_context"]["bpc"]),
++                         fmt(b["full_context"]["bpc"])])
++    write_table("selection", ["run", "step (acc)", "step (loss)", "fixed-set acc, acc ckpt (%)", "fixed-set acc, loss ckpt (%)",
++                              "val-split acc, acc ckpt (%)", "val-split acc, loss ckpt (%)", "val-split BPC, acc ckpt",
++                              "val-split BPC, loss ckpt"], rows,
++                "Checkpoint selected by fixed-validation accuracy (BPC tie-break; used for every v6 number) vs the one with the "
++                "lowest fixed-validation loss. Fixed set: 1,024 × 512 windows (selection); val split: whole validation split, W = 512, "
++                "stride 128.")
++
++
++def write_errors():
++    """Test top-1 accuracy by the target's position in its word (scripts/analyze_errors.py, W = 512, stride 128)."""
++    rows, csv_rows = [], []
++    for key in ("AL-3M", "AL-14M", "v5-alibi", "v5-rope"):
++        runs = {s: load(ENTITIES[key][1](s), "errors_W512.json") for s in SEEDS}
++        runs = {s: e for s, e in runs.items() if e}
++        if not runs:
++            continue
++        names = list(next(iter(runs.values()))["groups"])
++        for g in names:
++            col = {f: mean_std([e["groups"][g][f] for e in runs.values()]) for f in ("share_of_targets", "acc", "bpc", "share_of_errors")}
++            rows.append([ENTITIES[key][0], g, len(runs), pct(*col["share_of_targets"][:2]), pct(*col["acc"][:2]),
++                         fmt(*col["bpc"][:2]), pct(*col["share_of_errors"][:2])])
++            csv_rows.append([key, g, len(runs)] + [col[f][0] for f in col] + [col[f][1] for f in col])
++        acc, bpc = (mean_std([e[f] for e in runs.values()]) for f in ("acc", "bpc"))
++        rows.append([ENTITIES[key][0], "all", len(runs), "100", pct(*acc[:2]), fmt(*bpc[:2]), "100"])
++    write_table("errors_by_word_position", ["model", "target", "seeds", "share of targets (%)", "top-1 acc (%)", "BPC",
++                                            "share of all errors (%)"], rows,
++                "Test set, W = 512, stride 128: top-1 accuracy by the target's position in its word ('space' = the target is a "
++                "space, i.e. the end of a word; '1st letter' = the first letter of a word).",
++                csv_rows=csv_rows, csv_header=["key", "group", "n_seeds", "share_of_targets", "acc", "bpc", "share_of_errors",
++                                               "share_of_targets_std", "acc_std", "bpc_std", "share_of_errors_std"])
++
++
++def write_gpu_time():
++    recs = status_records()
++    rows, total = [], 0.0
++    by_phase = {}
++    for r in recs:
++        by_phase.setdefault(r["phase"], []).append(r)
++    for phase, rs in by_phase.items():
++        sec = sum(r["seconds"] for r in rs)
++        total += sec
++        rows.append([phase, len(rs), sum(r["complete"] for r in rs), f"{sec / 3600:.2f}",
++                     sorted({p for r in rs for p in r["foreign_gpu_pids_seen"]}) or "none"])
++    rows.append(["total", len(recs), sum(r["complete"] for r in recs), f"{total / 3600:.2f}", ""])
++    for gpu in sorted({r["gpu"] for r in recs}):
++        rs = [r for r in recs if r["gpu"] == gpu]
++        rows.append([f"of which GPU {gpu}", len(rs), sum(r["complete"] for r in rs), f"{sum(r['seconds'] for r in rs) / 3600:.2f}", ""])
++    first, last = min(r["start"] for r in recs), max(r["end"] for r in recs)
++    write_table("gpu_time", ["phase", "jobs", "complete", "GPU hours (sum of job wall times)", "foreign GPU processes seen"], rows,
++                "GPU time of this round (RTX 3090s; GPU 3 only until 14:43, then GPUs 2 and 3 with one job per GPU); seconds per job "
++                f"from runs/v6_status.jsonl. Wall clock from the first job's start to the last job's end: {first} to {last}.")
++    rows = []
++    for model in MODELS:
++        for run in [search_run(model, lr) for lr in LR_GRID + [BRACKET_LR]] + [formal_run(model, s) for s in SEEDS]:
++            t, cfg, sel = load(run, "timing.json"), load_yaml(run), selected_val(run)
++            rec = [r for r in recs if r["job"] == run]
++            if t is None or cfg is None or sel is None:
++                continue
++            rows.append([run, cfg["run"]["seed"], cfg["training"]["learning_rate"], f"{PARAMS[model]:,}", t["updates"],
++                         f"{t['train_tokens']:,}", f"{sel[3]}{sel[2]}", f"{t['s_per_step_median']:.4f}",
++                         f"{t['total_train_time_s'] / 60:.1f}", f"{rec[-1]['seconds'] / 60:.1f}" if rec else "",
++                         t["cuda_visible_devices"], t["peak_device_memory_gib_training"], cfg["run"]["git_commit"][:7]
++                         + ("-dirty" if cfg["run"]["git_commit"].endswith("-dirty") else "")])
++    write_table("runs", ["run", "seed", "peak lr", "parameters", "updates", "training characters",
++                         "selected checkpoint (checkpoints/<run>/best/)", "s / update (median)", "training min",
++                         "job min (incl. validation-split eval)", "GPU", "peak GiB", "code"], rows,
++                "Every v6 training run: seed, actual updates and training characters (timing.json), the checkpoint that every "
++                "reported number of the run comes from, speed and memory. Code: the commit recorded by train.py; -dirty = with the "
++                "uncommitted changes of results/v6/code/ (snapshot of each launch).")
++    return total
++
++
++# ---------------------------------------------------------------------------------------------- figures
++def style(ax):
++    ax.spines[["top", "right"]].set_visible(False)
++    for sp in ("left", "bottom"):
++        ax.spines[sp].set_color(MUTED)
++    ax.tick_params(colors=MUTED, labelsize=9)
++    ax.grid(True, color=GRID, linewidth=0.6)
++    ax.set_axisbelow(True)
++
++
++def save(fig, stem):
++    FIGS.mkdir(parents=True, exist_ok=True)
++    fig.savefig(FIGS / f"{stem}.pdf", bbox_inches="tight", metadata={"CreationDate": None})
++    fig.savefig(FIGS / f"{stem}.png", dpi=150, bbox_inches="tight")
++    plt.close(fig)
++
++
++def fig_curves():
++    fig, axes = plt.subplots(1, 3, figsize=(13, 3.6))
++    panels = [("bpc", "validation BPC (fixed set)"), ("acc", "validation Acc_all (%)"), ("gap", "validation − training BPC")]
++    for ax, (key, title) in zip(axes, panels):
++        for model in MODELS:
++            for s in SEEDS:
++                h = history(formal_run(model, s))
++                if h is None:
++                    continue
++                its = np.asarray(h["iteration"])
++                tok = (its + 1) * TOKENS_PER_UPDATE / 1e6
++                if key == "gap":
++                    y = np.asarray(h["bpc"]) - np.asarray([train_bpc_near(h, int(i), 500) or np.nan for i in its])
++                else:
++                    y = np.asarray(h[key]) * (100 if key == "acc" else 1)
++                keep = its >= 2000
++                ax.plot(tok[keep], y[keep], color=COLORS[model], lw=2 if s == FORMAL_SEED else 1,
++                        alpha=1 if s == FORMAL_SEED else 0.55, label=f"{model}" if s == FORMAL_SEED else None)
++        ax.set_title(title, fontsize=10, color=INK, loc="left")
++        ax.set_xlabel("training characters (M)", fontsize=9, color=MUTED)
++        style(ax)
++    if axes[0].get_legend_handles_labels()[0]:
++        axes[0].legend(frameon=False, fontsize=9)
++    fig.text(0.01, -0.04, "thick: seed 42; thin: seeds 43, 44. From iteration 2,000 (end of warmup).", fontsize=8, color=MUTED)
++    save(fig, "training_curves")
++
++
++def fig_search():
++    fig, ax = plt.subplots(figsize=(4.6, 3.4))
++    for model in MODELS:
++        pts = [(float(lr), selected_val(search_run(model, lr))) for lr in LR_GRID]
++        pts = [(x, 100 * v[0]) for x, v in pts if v]
++        if pts:
++            ax.plot(*zip(*pts), marker="o", ms=8, lw=2, color=COLORS[model], label=model)
++            ax.annotate(model, pts[0], xytext=(0, 9), textcoords="offset points", fontsize=9, color=INK, ha="center")
++        extra = selected_val(search_run(model, BRACKET_LR))
++        if pts and extra:  # post-hoc bracket check: hollow marker, dashed
++            ax.plot([pts[-1][0], float(BRACKET_LR)], [pts[-1][1], 100 * extra[0]], ls="--", lw=1.5, color=COLORS[model])
++            ax.plot(float(BRACKET_LR), 100 * extra[0], marker="o", ms=8, mfc="white", mew=2, color=COLORS[model])
++    ax.set_xscale("log")
++    ax.set_xticks([float(x) for x in LR_GRID + [BRACKET_LR]], LR_GRID + [BRACKET_LR])
++    ax.text(0.99, 0.02, "hollow: post-hoc 4× check (not used for selection)", transform=ax.transAxes, ha="right", fontsize=7.5,
++            color=MUTED)
++    ax.minorticks_off()
++    ax.set_xlabel("peak learning rate", fontsize=9, color=MUTED)
++    ax.set_title(f"validation Acc_all (%) after {SEARCH_ITERS // 1000}k iterations", fontsize=10, color=INK, loc="left")
++    if ax.get_legend_handles_labels()[0]:
++        ax.legend(frameon=False, fontsize=9)
++    style(ax)
++    save(fig, "lr_search")
++
++
++def fig_acc_vs_w():
++    fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.6))
++    keys = ["AL-3M", "AL-14M", "v5-alibi", "v5-rope"]
++    for ax, (metric, title, sc) in zip(axes, [("acc", "test Acc_all (%)", 100), ("bpc", "test BPC", 1)]):
++        for key in keys:
++            pts = [(W, mean_std(list(entity_metric(key, W, metric).values()))) for W in LENGTHS]
++            pts = [(W, m * sc, (sd if sd == sd else 0) * sc) for W, (m, sd, n) in pts if m is not None]
++            if not pts:
++                continue
++            x, y, e = zip(*pts)
++            ax.errorbar(x, y, yerr=e, marker="o", ms=7, lw=2, capsize=3, color=COLORS[key], label=ENTITIES[key][0])
++        ax.set_xscale("log", base=2)
++        ax.set_xticks(LENGTHS, [str(W) for W in LENGTHS])
++        ax.minorticks_off()
++        ax.set_xlabel("evaluation window W (stride 128)", fontsize=9, color=MUTED)
++        ax.set_title(title, fontsize=10, color=INK, loc="left")
++        style(ax)
++    if axes[0].get_legend_handles_labels()[0]:
++        fig.legend(*axes[0].get_legend_handles_labels(), frameon=False, fontsize=8, loc="lower center", ncol=2,
++                   bbox_to_anchor=(0.5, -0.16))
++    save(fig, "test_vs_W")
++
++
++def fig_compute():
++    """Validation Acc_all vs training GPU minutes: 10k-iteration search runs (chosen lr) and the 50k formal runs."""
++    fig, ax = plt.subplots(figsize=(5.2, 3.6))
++    for model in MODELS:
++        pts = []
++        budgets = ((search_run(model, chosen_lr(model) or LR_GRID[0]), SEARCH_ITERS), (formal_run(model, FORMAL_SEED), FORMAL_ITERS))
++        for run, chars in budgets:
++            t, v = load(run, "timing.json"), selected_val(run)
++            if t and v:
++                pts.append((t["total_train_time_s"] / 60, 100 * v[0], chars * TOKENS_PER_UPDATE / 1e6))
++        if not pts:
++            continue
++        x, y, c = zip(*pts)
++        ax.plot(x, y, marker="o", ms=8, lw=2, color=COLORS[model], label=f"{model} ({PARAMS[model] / 1e6:.1f}M)")
++        for xi, yi, ci in pts:
++            ax.annotate(f"{ci:.0f}M chars", (xi, yi), xytext=(7, -10), textcoords="offset points", fontsize=8, color=MUTED)
++    ax.set_xscale("log")
++    ax.set_xticks([5, 10, 20, 50, 100], ["5", "10", "20", "50", "100"])
++    ax.minorticks_off()
++    ax.set_xlabel("training time on one RTX 3090 (min, log scale)", fontsize=9, color=MUTED)
++    ax.set_title("validation Acc_all (%), W = 512", fontsize=10, color=INK, loc="left")
++    if ax.get_legend_handles_labels()[0]:
++        ax.legend(frameon=False, fontsize=9, loc="upper left")
++    style(ax)
++    save(fig, "acc_vs_compute")
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--sync", action="store_true")
++    args = ap.parse_args()
++    if args.sync:
++        sync()
++    worst = write_reuse_check()
++    write_metrics_at(MAIN_W, list(ENTITIES), "test_W512", f"Test set, W = {MAIN_W}, stride 128 (4,999,999 targets, each scored once); "
++                     "mean ± std over seeds. v5 / v3 rows: best-validation-loss checkpoints (their selection rule); v6 rows: "
++                     "best-validation-accuracy checkpoints (BPC tie-break).")
++    for W in (128, 1024):
++        write_metrics_at(W, list(ENTITIES), f"test_W{W}", f"Test set, W = {W}, stride 128; as test_W512.")
++    write_metrics_at(MAIN_W, ["AL-3M", "AL-14M"], "val_W512", f"Validation split, W = {MAIN_W}, stride 128 (4,499,999 targets).",
++                     split="val")
++    write_by_w("test")
++    write_by_w("val")
++    write_search()
++    gain, accd, bpcd = write_formal_val()
++    write_paired_test()
++    write_curves()
++    write_budget_scaling()
++    write_selection()
++    write_errors()
++    total = write_gpu_time()
++    fig_curves()
++    fig_search()
++    fig_acc_vs_w()
++    fig_compute()
++    best = {k: mean_std(list(entity_metric(k, MAIN_W, "acc").values()))[0] for k in ENTITIES}
++    best = {k: v for k, v in best.items() if v is not None}
++    print(f"re-evaluation vs existing files: max |ΔBPC| {worst['bpc']:.1e}, max |ΔAcc| {100 * worst['acc']:.1e} pp")
++    print(f"seed-42 gain rule: {gain}; val Acc 14M − 3M {accd[:3]}, BPC {bpcd[:3]}")
++    for k, v in best.items():
++        print(f"test Acc_all W=512 {k}: {100 * v:.2f}% -> {TARGET_ACC - 100 * v:.2f} pp below {TARGET_ACC:.0f}%")
++    print(f"GPU hours (v6 jobs): {total / 3600:.2f}")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/results/v6/configs/AL-14M.yaml b/results/v6/configs/AL-14M.yaml
+new file mode 100644
+index 0000000..20ee177
+--- /dev/null
++++ b/results/v6/configs/AL-14M.yaml
+@@ -0,0 +1,86 @@
++# v6 capacity study (results/v6/REPORT.md): AL-14M, 14,204,928 parameters. Identical to configs/final/TR.yaml except
++# ALiBi, 512-character windows x batch 32 (16,384 training characters per update, as TR.yaml's 128 x 128),
++# selection by validation accuracy (BPC tie-break), one stage checkpoint (disk), the model size, and the
++# validation-split evaluation at W = 512 with stride 128. The learning rate is set per model by the v6 search (--set).
++model_name: AL-14M
++
++model:
++  type: transformer
++  vocab_size: 27
++  d_model: 384
++  n_heads: 6
++  n_layers: 8
++  max_len: 512
++  mlp_ratio: 4
++  emb_dropout: 0.0
++  mlp_dropout: 0.0
++  attn_dropout: 0.0
++  resid_dropout: 0.0
++  # position encoding type: 'sinusoidal', 'learned', 'hybrid', 'rope', 'alibi', 'relative', 'none' (NoPE)
++  pos_encoding_type: 'alibi'
++  # scaling of the fixed sinusoidal table ('sinusoidal' and the sinusoidal half of 'hybrid'):
++  # 'unit' = every row has norm 1 (default); 'raw' = unscaled, row norm sqrt(d_model/2) (~11.3 at d_model 256)
++  sinusoidal_scale: unit
++
++loss:
++  LABEL_SMOOTHING: True
++  # 0.0 = label smoothing off (chosen by the v3 search; same loss as LABEL_SMOOTHING: False)
++  ls_eps: 0.0
++  # entropy bonus weight
++  entropy_lambda: 0.0
++  # position weights mode, linear, sqrt, none
++  tail_scheme: 'linear'
++
++scheduler:
++  warmup_iters: 2000
++  init_value: 0.0
++  end_value: 0.0
++
++optimizer:
++  # AdamW (after clip_by_global_norm(grad_clip_norm)); these were hard-coded in the notebook
++  b1: 0.9
++  b2: 0.95
++  eps: 1.0e-8
++  weight_decay: 0.1
++  grad_clip_norm: 1.0
++  # true: decay only leaves with ndim >= 2 (never biases, LayerNorm, or rel_embed); false: decay everything
++  decay_mask: true
++
++training:
++  batch_size: 32
++  sequence_length: 512
++  learning_rate: 0.0018
++  epochs: 50000
++  validation_interval: 500
++  stage_checkpoint_interval: 50000
++  # 'acc': checkpoint with the highest fixed-validation accuracy, ties broken by the lower loss (= lower BPC)
++  checkpoint_selection: acc
++  seed: 4212   # overridden by train.py --seed
++
++evaluation:
++  sample: True
++  seed: 4212
++  # prompt for text generation
++  prompt: "hello my fri"
++  # length of text to generate
++  gen_len: 1000
++  # temperature for text generation
++  temperature: 0.7
++  self_belu_n_grams: 4
++  self_belu_n_samples: 20
++  # sliding-window test evaluation (utils/full_context_eval.py): window = model.max_len
++  full_context_stride: 1
++  full_context_batch_size: 256
++  # multi-prompt Self-BLEU: n_prompts passages of prompt_len chars from the validation split (fixed offsets, seed 0),
++  # n_samples continuations per prompt (one batch); Self-BLEU within each prompt, mean +- std over prompts
++  self_bleu_multi_n_prompts: 10
++  self_bleu_multi_n_samples: 20
++  self_bleu_multi_prompt_len: 128
++  # --tuning: full-context evaluation of the validation split with this stride (the test file is never opened)
++  tuning_val_stride: 128
++
++output:
++  # directory to save model checkpoints
++  checkpoint_dir: ./checkpoints
++  # directory to save training and evaluation results
++  results_dir: ./runs
+diff --git a/results/v6/configs/AL-3M.yaml b/results/v6/configs/AL-3M.yaml
+new file mode 100644
+index 0000000..67ce416
+--- /dev/null
++++ b/results/v6/configs/AL-3M.yaml
+@@ -0,0 +1,86 @@
++# v6 capacity study (results/v6/REPORT.md): AL-3M, 3,169,280 parameters. Identical to configs/final/TR.yaml except
++# ALiBi, 512-character windows x batch 32 (16,384 training characters per update, as TR.yaml's 128 x 128),
++# selection by validation accuracy (BPC tie-break), one stage checkpoint (disk), the model size, and the
++# validation-split evaluation at W = 512 with stride 128. The learning rate is set per model by the v6 search (--set).
++model_name: AL-3M
++
++model:
++  type: transformer
++  vocab_size: 27
++  d_model: 256
++  n_heads: 4
++  n_layers: 4
++  max_len: 512
++  mlp_ratio: 4
++  emb_dropout: 0.0
++  mlp_dropout: 0.0
++  attn_dropout: 0.0
++  resid_dropout: 0.0
++  # position encoding type: 'sinusoidal', 'learned', 'hybrid', 'rope', 'alibi', 'relative', 'none' (NoPE)
++  pos_encoding_type: 'alibi'
++  # scaling of the fixed sinusoidal table ('sinusoidal' and the sinusoidal half of 'hybrid'):
++  # 'unit' = every row has norm 1 (default); 'raw' = unscaled, row norm sqrt(d_model/2) (~11.3 at d_model 256)
++  sinusoidal_scale: unit
++
++loss:
++  LABEL_SMOOTHING: True
++  # 0.0 = label smoothing off (chosen by the v3 search; same loss as LABEL_SMOOTHING: False)
++  ls_eps: 0.0
++  # entropy bonus weight
++  entropy_lambda: 0.0
++  # position weights mode, linear, sqrt, none
++  tail_scheme: 'linear'
++
++scheduler:
++  warmup_iters: 2000
++  init_value: 0.0
++  end_value: 0.0
++
++optimizer:
++  # AdamW (after clip_by_global_norm(grad_clip_norm)); these were hard-coded in the notebook
++  b1: 0.9
++  b2: 0.95
++  eps: 1.0e-8
++  weight_decay: 0.1
++  grad_clip_norm: 1.0
++  # true: decay only leaves with ndim >= 2 (never biases, LayerNorm, or rel_embed); false: decay everything
++  decay_mask: true
++
++training:
++  batch_size: 32
++  sequence_length: 512
++  learning_rate: 0.0018
++  epochs: 50000
++  validation_interval: 500
++  stage_checkpoint_interval: 50000
++  # 'acc': checkpoint with the highest fixed-validation accuracy, ties broken by the lower loss (= lower BPC)
++  checkpoint_selection: acc
++  seed: 4212   # overridden by train.py --seed
++
++evaluation:
++  sample: True
++  seed: 4212
++  # prompt for text generation
++  prompt: "hello my fri"
++  # length of text to generate
++  gen_len: 1000
++  # temperature for text generation
++  temperature: 0.7
++  self_belu_n_grams: 4
++  self_belu_n_samples: 20
++  # sliding-window test evaluation (utils/full_context_eval.py): window = model.max_len
++  full_context_stride: 1
++  full_context_batch_size: 256
++  # multi-prompt Self-BLEU: n_prompts passages of prompt_len chars from the validation split (fixed offsets, seed 0),
++  # n_samples continuations per prompt (one batch); Self-BLEU within each prompt, mean +- std over prompts
++  self_bleu_multi_n_prompts: 10
++  self_bleu_multi_n_samples: 20
++  self_bleu_multi_prompt_len: 128
++  # --tuning: full-context evaluation of the validation split with this stride (the test file is never opened)
++  tuning_val_stride: 128
++
++output:
++  # directory to save model checkpoints
++  checkpoint_dir: ./checkpoints
++  # directory to save training and evaluation results
++  results_dir: ./runs
+diff --git a/scripts/analyze_errors.py b/scripts/analyze_errors.py
+new file mode 100644
+index 0000000..e662511
+--- /dev/null
++++ b/scripts/analyze_errors.py
+@@ -0,0 +1,112 @@
++"""
++Where the top-1 errors are: sliding-window accuracy and BPC grouped by the target's position in its word.
++
++    python scripts/analyze_errors.py --run v6-AL-14M_s42 --length 512        # -> runs/<run>/errors_W512.json
++
++Same windows and scoring as utils/full_context_eval.py (window W, stride S, every target scored exactly once), so the
++overall accuracy equals extrapolation.json's. Each target character t is put in one group: 'space' (the target is a
++space, i.e. the end of a word), or the position of the letter in its word (1st = the previous character is a space or
++t starts the file, ..., 4th+). The checkpoint is the run's selected one (train.selected_checkpoint) unless --checkpoint.
++--split val scores the validation split and never opens the test file (_val).
++"""
++
++import argparse
++import json
++import math
++import sys
++import time
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT))
++sys.path.insert(0, str(ROOT / "scripts"))
++
++import jax  # noqa: E402
++import jax.numpy as jnp  # noqa: E402
++import numpy as np  # noqa: E402
++
++import train  # noqa: E402
++from eval_extrapolation import checkpoint_prefix, load_run  # noqa: E402
++from utils.extrapolation_eval import auto_batch_size, rebuild_for_length  # noqa: E402
++from utils.full_context_eval import num_windows, window_bounds  # noqa: E402
++
++MAX_POS = 4
++GROUP_NAMES = ["space", "1st letter", "2nd letter", "3rd letter", "4th+ letter"]
++
++
++def word_position_groups(data, max_pos=MAX_POS):
++    """Group of every character: 0 for a space, else its position in the word, capped at max_pos."""
++    data = np.asarray(data)
++    is_space = data == train.CHAR_TO_INT[" "]
++    idx = np.arange(len(data))
++    last = np.maximum.accumulate(np.where(is_space, idx, -1))
++    last_before = np.concatenate([[-1], last[:-1]])  # index of the last space before each character (-1: none)
++    return np.where(is_space, 0, np.minimum(idx - last_before, max_pos)).astype(np.int32)
++
++
++def grouped_eval(model, params, data_int, window, stride=128, batch_size=256):
++    n_chars = len(data_int)
++    n_win = num_windows(n_chars, window, stride)
++    n_groups = len(GROUP_NAMES)
++    labels = jnp.asarray(word_position_groups(data_int))
++    data = jnp.asarray(np.asarray(data_int), dtype=jnp.int32)
++    positions = jnp.arange(window)
++
++    @jax.jit
++    def eval_batch(params, k0):
++        k = k0 + jnp.arange(batch_size)
++        end, n_new = window_bounds(k, n_chars, window, stride, xp=jnp)
++        idx = (end - window)[:, None] + positions[None, :]
++        x, y, g = data[idx], data[idx + 1], labels[idx + 1].reshape(-1)
++        logits = model.apply({"params": params}, x, deterministic=True)
++        scored = (positions[None, :] >= (window - n_new)[:, None]).reshape(-1)
++        nll = -jnp.take_along_axis(jax.nn.log_softmax(logits, axis=-1), y[..., None], axis=-1).reshape(-1)
++        correct = (jnp.argmax(logits, axis=-1) == y).reshape(-1)
++        return (jnp.zeros(n_groups, jnp.int32).at[g].add(scored.astype(jnp.int32)),
++                jnp.zeros(n_groups, jnp.int32).at[g].add((correct & scored).astype(jnp.int32)),
++                jnp.zeros(n_groups, jnp.float32).at[g].add(jnp.where(scored, nll, 0.0)))
++
++    count, n_correct, nll = (np.zeros(n_groups, np.float64) for _ in range(3))
++    t0 = time.time()
++    for b in range(math.ceil(n_win / batch_size)):
++        c, r, s = jax.device_get(eval_batch(params, jnp.int32(b * batch_size)))
++        count, n_correct, nll = count + c, n_correct + r, nll + s
++    n, n_err = count.sum(), (count - n_correct).sum()
++    groups = {name: {"count": int(count[g]), "share_of_targets": float(count[g] / n),
++                     "acc": float(n_correct[g] / count[g]) if count[g] else None,
++                     "bpc": float(nll[g] / count[g] / np.log(2)) if count[g] else None,
++                     "share_of_errors": float((count[g] - n_correct[g]) / n_err) if n_err else 0.0}
++              for g, name in enumerate(GROUP_NAMES)}
++    return {"window": int(window), "stride": int(stride), "n_scored": int(n), "acc": float(n_correct.sum() / n),
++            "bpc": float(nll.sum() / n / np.log(2)), "groups": groups, "seconds": time.time() - t0}
++
++
++def main(argv=None):
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--run", required=True)
++    ap.add_argument("--length", type=int, default=512)
++    ap.add_argument("--stride", type=int, default=128)
++    ap.add_argument("--split", choices=["test", "val"], default="test")
++    ap.add_argument("--checkpoint", default=None, choices=[p for p, _ in train.CHECKPOINT_TYPES])
++    ap.add_argument("--tag", default="")
++    ap.add_argument("--data-dir", default=str(ROOT / "data"))
++    args = ap.parse_args(argv)
++
++    run_dir, config, ckpt = load_run(args.run, args.checkpoint)
++    _, val_int, test_int = train.load_data(args.data_dir, include_test=args.split == "test")
++    data = test_int if args.split == "test" else val_int
++    model = rebuild_for_length(config, args.length, train.build_model)
++    bs = auto_batch_size(config, args.length, 2048)
++    out = grouped_eval(model, ckpt["params"], data, args.length, args.stride, bs)
++    assert out["n_scored"] == len(data) - 1
++    out.update({"run": args.run, "checkpoint": checkpoint_prefix(config, args.checkpoint), "step": int(ckpt["step"]),
++                "split": args.split, "batch_size": bs, "git_commit": train.git_commit(), "device": jax.devices()[0].device_kind})
++    name = f"errors_W{args.length}" + ("_val" if args.split == "val" else "") + (f"_{args.tag}" if args.tag else "") + ".json"
++    json.dump(out, open(run_dir / name, "w"), indent=1)
++    print(f"{args.run} W={args.length}: acc {100 * out['acc']:.2f}%, BPC {out['bpc']:.4f}; "
++          + "; ".join(f"{k} {100 * v['share_of_targets']:.1f}% of targets, acc {100 * v['acc']:.1f}%" for k, v in out["groups"].items()))
++    print(f"Done: {run_dir / name}")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/scripts/launch_v6.py b/scripts/launch_v6.py
+new file mode 100644
+index 0000000..6b96190
+--- /dev/null
++++ b/scripts/launch_v6.py
+@@ -0,0 +1,272 @@
++"""
++Queue the v6 capacity experiments on fixed GPUs, one job per GPU (results/v6/REPORT.md).
++
++    nohup setsid bash -c 'for p in v5topk search formal seeds evals; do python scripts/launch_v6.py --gpus 3 --phase $p || exit 1; done' \
++        > runs/launch_v6.txt 2>&1 &
++    python scripts/launch_v6.py --phase formal --dry-run
++
++Every phase builds its queue when it starts, from the finished results of the earlier phases, so run the phases as
++separate, consecutive invocations (as above).
++
++Models (results/v6/configs/): AL-3M (4 layers, d_model 256, 4 heads, 3,169,280 parameters) and AL-14M (8 layers, 384,
++6 heads, 14,204,928), both ALiBi, trained from random initialisation on 512-character windows, batch 32 (16,384
++training characters per update), everything else as configs/final/TR.yaml. Checkpoints are selected on the fixed
++validation set by accuracy, ties broken by the lower loss (training.checkpoint_selection = acc).
++
++Phases:
++- v5topk: the best v5 models (ALiBi + 4,000 iterations of 512-window fine-tuning; RoPE + the same fine-tuning without
++  PI) and the 128-trained ALiBi runs, all seeds, re-evaluated on the test set (W = 128..1024, stride 128) to add top-k
++  accuracy; written to extrapolation_v6.json, the v5 / v3 files are not touched.
++- search: learning rate 0.5x / 1x / 2x of TR.yaml's 1.8e-3 for each model, SEARCH_ITERS iterations (warmup 2,000,
++  validation every 500, cosine to 0), seed SEARCH_SEED, validation only (--tuning). Same budget for both models.
++- formal: seed 42, FORMAL_ITERS = 50,000 iterations (819,200,000 training characters) at each model's chosen lr: the
++  search lr with the highest validation accuracy of the selected checkpoint on the whole validation split (W = 512,
++  stride 128; val_eval.json), ties broken by the lower validation BPC.
++- seeds: seeds 43 and 44 of both models, only if the seed-42 runs show a clear capacity gain (GAIN_RULE_PP, fixed
++  before the formal runs): AL-14M's validation accuracy is at least GAIN_RULE_PP percentage points above AL-3M's and
++  its validation BPC is lower. Otherwise the phase records the decision and queues nothing.
++- evals: every finished formal / seed run: validation split (W = 128, 256, 512, 1024, stride 128), then the test split
++  (same W), then the test-set error breakdown by position in the word (scripts/analyze_errors.py, W = 512) of these runs
++  and of the two best v5 conditions. The test set is opened only in this phase and in v5topk; nothing is selected on it.
++- bracket (added after the search, whose best lr was the upper edge 3.6e-3 for both models): BRACKET_LR = 4x, same
++  protocol as the search, both models. A post-hoc check of whether the optimum is bracketed; it is not used to choose
++  the lr of the formal runs (those had started).
++A GPU is used only when nobody else has a process on it. Finished jobs are skipped, so the launcher can be restarted;
++a training job whose process is still running (e.g. left by a stopped launcher) is waited for, never started twice;
++failed jobs are recorded, not retried. Each invocation snapshots the code (HEAD and the uncommitted diff, untracked
++source files included) into results/v6/code/. Records: runs/v6_status.jsonl (one line per finished job), logs:
++runs/<run>/launcher.txt (training), runs/eval_logs/<job>.txt (evaluations).
++"""
++
++import argparse
++import hashlib
++import json
++import re
++import subprocess
++import sys
++import time
++from datetime import datetime
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++from launch_all import descendants, gpu_state, is_free  # noqa: E402
++from launch_v3 import gpu_env  # noqa: E402
++
++ROOT = Path(__file__).resolve().parents[1]
++POLL_S = 10
++MODELS = {"AL-3M": "results/v6/configs/AL-3M.yaml", "AL-14M": "results/v6/configs/AL-14M.yaml"}
++BASE_LR = 1.8e-3  # configs/final/TR.yaml
++LR_GRID = ["9e-4", "1.8e-3", "3.6e-3"]  # 0.5x, 1x, 2x
++BRACKET_LR = "7.2e-3"  # 4x, post-hoc check (bracket phase)
++SEARCH_SEED = 4212  # the tuning seed of v3 / v4, distinct from the final seeds
++SEARCH_ITERS = 10000
++FORMAL_ITERS = 50000
++FORMAL_SEED = 42
++EXTRA_SEEDS = [43, 44]
++GAIN_RULE_PP = 0.3
++EVAL_W = ["128", "256", "512", "1024"]
++V5_RUNS = [f"ft4k-alibi512_lr3e-5_s{s}" for s in (42, 43, 44)] + [f"ft4k-long512_lr3e-4_s{s}" for s in (42, 43, 44)] \
++    + [f"TR-final-alibi_s{s}" for s in (42, 43, 44)]
++SOURCE_DIRS = ("train.py", "models/", "utils/", "scripts/", "tests/", "configs/", "results/v6/configs/", "results/v6/aggregate_v6.py")
++
++
++def search_run(model, lr):
++    return f"v6search-{model}_lr{lr}"
++
++
++def formal_run(model, seed):
++    return f"v6-{model}_s{seed}"
++
++
++def val_eval(run):
++    """val_eval.json of a finished --tuning run, or None."""
++    try:
++        e = json.load(open(ROOT / "runs" / run / "val_eval.json"))
++        return e if "full_context" in e["checkpoints"][e["selected_checkpoint"]] else None
++    except (FileNotFoundError, KeyError, json.JSONDecodeError):
++        return None
++
++
++def selected_val(run):
++    """(validation accuracy, validation BPC) of the selected checkpoint on the whole validation split."""
++    e = val_eval(run)
++    fc = e["checkpoints"][e["selected_checkpoint"]]["full_context"]
++    return fc["acc"], fc["bpc"]
++
++
++def chosen_lr(model):
++    """Search lr with the highest validation accuracy, ties broken by the lower BPC; None while the search runs."""
++    if any(val_eval(search_run(model, lr)) is None for lr in LR_GRID):
++        return None
++    return max(LR_GRID, key=lambda lr: (selected_val(search_run(model, lr))[0], -selected_val(search_run(model, lr))[1]))
++
++
++def gain_decision():
++    """(clear gain?, text) from the seed-42 formal runs (GAIN_RULE_PP)."""
++    small, big = formal_run("AL-3M", FORMAL_SEED), formal_run("AL-14M", FORMAL_SEED)
++    if val_eval(small) is None or val_eval(big) is None:
++        return None, "seed-42 formal runs not finished"
++    (a3, b3), (a14, b14) = selected_val(small), selected_val(big)
++    gain = 100 * (a14 - a3)
++    ok = gain >= GAIN_RULE_PP and b14 < b3
++    return ok, (f"validation acc AL-14M {100 * a14:.3f}% vs AL-3M {100 * a3:.3f}% (gain {gain:+.3f} pp, rule >= {GAIN_RULE_PP}), "
++                f"BPC {b14:.4f} vs {b3:.4f} -> {'clear gain: run seeds 43, 44' if ok else 'no clear gain: no further seeds'}")
++
++
++def snapshot_code(tag):
++    """Write HEAD, `git status` and the uncommitted diff (tracked changes + untracked source files) to results/v6/code/."""
++    def git(*a):
++        return subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True).stdout
++    head = git("rev-parse", "HEAD").strip()
++    patch = git("diff", "HEAD", "--binary")
++    untracked = [f for f in git("ls-files", "--others", "--exclude-standard").split()
++                 if f.startswith(SOURCE_DIRS) and "__pycache__" not in f]
++    for f in untracked:
++        patch += git("diff", "--no-index", "--binary", "/dev/null", f)
++    sha = hashlib.sha256(patch.encode()).hexdigest()[:12]
++    out = ROOT / "results" / "v6" / "code"
++    out.mkdir(parents=True, exist_ok=True)
++    name = f"{datetime.now():%Y%m%d-%H%M%S}_{tag}_{head[:7]}_{sha}"
++    (out / f"{name}.patch").write_text(patch)
++    (out / f"{name}.txt").write_text(f"HEAD {head}\npatch sha256[:12] {sha}\nuntracked source files: {untracked}\n\n"
++                                      f"git status --porcelain:\n{git('status', '--porcelain')}")
++    return name
++
++
++def build_jobs(phase):
++    """[(name, kind, runs it needs, done-check path or None for training, argv)]."""
++    py = sys.executable
++    jobs = []
++
++    def train_job(run, model, lr, seed, iters, warmup=2000):
++        jobs.append((run, "train", [], None, [py, "train.py", "--config", MODELS[model], "--seed", str(seed), "--run-name", run,
++                                              "--tuning", "--set", f"training.learning_rate={lr}", "--set", f"training.epochs={iters}",
++                                              "--set", f"scheduler.warmup_iters={warmup}",
++                                              "--set", f"training.stage_checkpoint_interval={iters}"]))
++
++    def eval_job(name, run, out, argv):
++        jobs.append((name, "eval", [run], f"runs/{run}/{out}", [py] + argv))
++
++    if phase == "v5topk":
++        for run in V5_RUNS:
++            eval_job(f"topk:{run}", run, "extrapolation_v6.json",
++                     ["scripts/eval_extrapolation.py", "--run", run, "--lengths", *EVAL_W, "--tag", "v6"])
++    elif phase in ("search", "bracket"):
++        for model in MODELS:
++            for lr in (LR_GRID if phase == "search" else [BRACKET_LR]):
++                train_job(search_run(model, lr), model, lr, SEARCH_SEED, SEARCH_ITERS)
++    elif phase in ("formal", "seeds"):
++        if phase == "seeds":
++            ok, text = gain_decision()
++            print(f"phase seeds: {text}", flush=True)
++            if not ok:
++                return jobs
++        for model in MODELS:
++            lr = chosen_lr(model)
++            if lr is None:
++                raise SystemExit(f"phase {phase}: the lr search of {model} has not finished")
++            print(f"phase {phase}: {model} lr {lr} "
++                  f"(search: {[(x, *[round(v, 6) for v in selected_val(search_run(model, x))]) for x in LR_GRID]})", flush=True)
++            for seed in ([FORMAL_SEED] if phase == "formal" else EXTRA_SEEDS):
++                train_job(formal_run(model, seed), model, lr, seed, FORMAL_ITERS)
++        if phase == "seeds":  # largest model first, so that on two GPUs the two long runs go in parallel
++            jobs.sort(key=lambda j: -list(MODELS).index(j[0].split("_s")[0].removeprefix("v6-")))
++    elif phase == "evals":
++        runs = [formal_run(m, s) for s in [FORMAL_SEED] + EXTRA_SEEDS for m in MODELS if val_eval(formal_run(m, s))]
++        for split in ("val", "test"):
++            for run in runs:
++                eval_job(f"{split}:{run}", run, "extrapolation_val.json" if split == "val" else "extrapolation.json",
++                         ["scripts/eval_extrapolation.py", "--run", run, "--split", split, "--lengths", *EVAL_W])
++        for run in runs + [r for r in V5_RUNS if r.startswith("ft4k-")]:
++            eval_job(f"errors:{run}", run, "errors_W512.json", ["scripts/analyze_errors.py", "--run", run, "--length", "512"])
++    else:
++        raise SystemExit(f"unknown phase {phase!r}")
++    return jobs
++
++
++def finished(job):
++    name, kind, _, out, _ = job
++    return val_eval(name) is not None if kind == "train" else (ROOT / out).exists()
++
++
++def in_progress(job):
++    """A training job whose train.py process is running already (started by an earlier, stopped launcher)."""
++    if job[1] != "train":
++        return False
++    pattern = f"train[.]py .*--run-name {re.escape(job[0])}( |$)"
++    return subprocess.run(["pgrep", "-f", pattern], capture_output=True).returncode == 0
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--gpus", default="3")
++    ap.add_argument("--phase", required=True, choices=["v5topk", "search", "formal", "seeds", "evals", "bracket"])
++    ap.add_argument("--dry-run", action="store_true")
++    args = ap.parse_args()
++
++    jobs = build_jobs(args.phase)
++    skipped = [j[0] for j in jobs if finished(j)]
++    queue = [j for j in jobs if j[0] not in skipped]
++    gpus = [int(g) for g in args.gpus.split(",")]
++    print(f"[{datetime.now():%F %T}] GPUs {gpus}; phase {args.phase}; skipped (finished): {skipped}")
++    print("Queue:\n  " + "\n  ".join(f"{j[0]}: {' '.join(j[4][1:])}" for j in queue), flush=True)
++    if args.dry_run or not queue:
++        return
++    snapshot = snapshot_code(args.phase)
++    print(f"code snapshot: results/v6/code/{snapshot}.patch", flush=True)
++
++    status = ROOT / "runs" / "v6_status.jsonl"
++    (ROOT / "runs" / "eval_logs").mkdir(parents=True, exist_ok=True)
++    running, failed = {}, set()
++    while queue or running:
++        state = gpu_state()
++        for gpu, r in list(running.items()):
++            ours = {r["proc"].pid, *descendants(r["proc"].pid)}
++            r["foreign"].update(p for p in state[gpu]["pids"] if p not in ours)
++            rc = r["proc"].poll()
++            if rc is None:
++                continue
++            r["log"].close()
++            ok = rc == 0 and finished(r["job"])
++            if not ok:
++                failed.add(r["job"][0])
++            rec = {"job": r["job"][0], "kind": r["job"][1], "phase": args.phase, "gpu": gpu, "cmd": " ".join(r["job"][4]),
++                   "start": r["start"], "end": f"{datetime.now():%F %T}", "seconds": round(time.time() - r["t0"], 1),
++                   "returncode": rc, "complete": ok, "foreign_gpu_pids_seen": sorted(r["foreign"]), "code_snapshot": snapshot}
++            with open(status, "a") as f:
++                f.write(json.dumps(rec) + "\n")
++            print(f"[{rec['end']}] finished {rec['job']} on GPU {gpu}: rc={rc}, complete={ok}, {rec['seconds'] / 60:.1f} min", flush=True)
++            del running[gpu]
++        for j in [j for j in queue if any(d in failed for d in j[2])]:
++            queue.remove(j)
++            failed.add(j[0])
++            print(f"[{datetime.now():%F %T}] dropped {j[0]}: dependency failed", flush=True)
++        for gpu in gpus:
++            if gpu in running or not is_free(state[gpu]):
++                continue
++            ready = [j for j in queue if not in_progress(j)]
++            if not ready:
++                break
++            job = ready[0]
++            queue.remove(job)
++            if finished(job):
++                print(f"[{datetime.now():%F %T}] skipped {job[0]}: finished meanwhile", flush=True)
++                continue
++            name, kind, _, _, argv = job
++            if kind == "train":
++                (ROOT / "runs" / name).mkdir(parents=True, exist_ok=True)
++                log_path = ROOT / "runs" / name / "launcher.txt"
++            else:
++                log_path = ROOT / "runs" / "eval_logs" / f"{name.replace(':', '_')}.txt"
++            log = open(log_path, "w")
++            proc = subprocess.Popen(argv, cwd=ROOT, env=gpu_env(gpu), stdout=log, stderr=subprocess.STDOUT)
++            running[gpu] = {"job": job, "proc": proc, "log": log, "start": f"{datetime.now():%F %T}", "t0": time.time(), "foreign": set()}
++            print(f"[{datetime.now():%F %T}] started {name} on GPU {gpu}: {' '.join(argv)}", flush=True)
++        time.sleep(POLL_S)
++    print(f"[{datetime.now():%F %T}] queue empty; failed: {sorted(failed)}", flush=True)
++    if failed:
++        raise SystemExit(1)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/scripts/run_v6_rest.sh b/scripts/run_v6_rest.sh
+new file mode 100755
+index 0000000..df7f163
+--- /dev/null
++++ b/scripts/run_v6_rest.sh
+@@ -0,0 +1,8 @@
++#!/bin/bash
++# Remaining v6 phases on GPUs 2 and 3 (restarted after GPU 2 became available; see results/v6/REPORT.md):
++# the other seeds, the post-hoc lr bracket check, then every evaluation (the test set is opened only in the last phase).
++source /home/jinhang/miniconda3/etc/profile.d/conda.sh && conda activate charllm-env
++cd "$(dirname "$0")/.." || exit 1
++for p in seeds bracket evals; do
++    python scripts/launch_v6.py --gpus 2,3 --phase "$p" || exit 1
++done
+diff --git a/tests/test_analyze_errors.py b/tests/test_analyze_errors.py
+new file mode 100644
+index 0000000..a6531c1
+--- /dev/null
++++ b/tests/test_analyze_errors.py
+@@ -0,0 +1,59 @@
++"""scripts/analyze_errors.py: sliding-window accuracy and loss grouped by the target's position in its word."""
++
++import sys
++from pathlib import Path
++
++import jax
++import numpy as np
++import pytest
++
++import train
++from helpers import make_config, model_and_params
++from utils.full_context_eval import full_context_eval, num_windows, window_bounds
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
++from analyze_errors import GROUP_NAMES, grouped_eval, word_position_groups  # noqa: E402
++
++SPACE = train.CHAR_TO_INT[" "]
++W, N = 16, 121
++
++
++def test_word_position_groups():
++    data = train.encode("ab c  def")
++    #       target:      a  b  ' ' c  ' ' ' ' d  e  f
++    #       position:    1  2  sp  1  sp  sp  1  2  3   (the first character has no previous one: start of a word)
++    np.testing.assert_array_equal(word_position_groups(data, max_pos=3), [1, 2, 0, 1, 0, 0, 1, 2, 3])
++    assert word_position_groups(train.encode("abcdef"), max_pos=3).tolist() == [1, 2, 3, 3, 3, 3]
++
++
++@pytest.mark.parametrize("stride", [1, 7])
++def test_grouped_eval_matches_brute_force(stride):
++    config = make_config(dropout=0.0, max_len=W)
++    model, params = model_and_params(config)
++    rng = np.random.default_rng(5)
++    data = np.where(rng.random(N) < 0.25, SPACE, rng.integers(0, 26, N)).astype(np.uint8)  # words and spaces
++    out = grouped_eval(model, params, data, window=W, stride=stride, batch_size=5)
++
++    k = np.arange(num_windows(N, W, stride))
++    end, n_new = window_bounds(k, N, W, stride)
++    groups = word_position_groups(data)
++    count, correct, nll = np.zeros(len(GROUP_NAMES)), np.zeros(len(GROUP_NAMES)), np.zeros(len(GROUP_NAMES))
++    for e, n in zip(end, n_new):
++        logits = np.asarray(model.apply({"params": params}, np.asarray(data[e - W:e], np.int32)[None], deterministic=True))[0]
++        logp = np.asarray(jax.nn.log_softmax(logits))
++        for t in range(e - n + 1, e + 1):
++            i = t - (e - W) - 1  # position of target t in this window
++            g = groups[t]
++            count[g] += 1
++            correct[g] += logits[i].argmax() == data[t]
++            nll[g] -= logp[i, data[t]]
++    assert out["n_scored"] == N - 1 == count.sum()
++    for g, name in enumerate(GROUP_NAMES):
++        r = out["groups"][name]
++        assert r["count"] == count[g]
++        if count[g]:
++            assert r["acc"] == pytest.approx(correct[g] / count[g], abs=1e-12)
++            assert r["bpc"] == pytest.approx(nll[g] / count[g] / np.log(2), rel=1e-5)
++    fc = full_context_eval(model, params, data, window=W, stride=stride, batch_size=5, verbose=False)
++    assert out["acc"] == pytest.approx(fc["acc"], abs=1e-12) and out["bpc"] == pytest.approx(fc["bpc"], rel=1e-6)
++    assert sum(r["share_of_errors"] for r in out["groups"].values()) == pytest.approx(1.0)
+diff --git a/tests/test_checkpoint_selection.py b/tests/test_checkpoint_selection.py
+new file mode 100644
+index 0000000..4fd6001
+--- /dev/null
++++ b/tests/test_checkpoint_selection.py
+@@ -0,0 +1,49 @@
++"""Checkpoint selection by validation accuracy, ties broken by the lower validation loss (training.checkpoint_selection)."""
++
++import pytest
++
++import train
++from helpers import make_config
++from utils.logger import Logger
++
++
++def _metrics(acc, loss):
++    return {"loss_all": loss, "loss_last": loss, "acc": acc, "acc_last": acc, "perplexity": 1.0, "bpc": loss,
++            "pred_entropy": 1.0, "ece": [0.0, None]}
++
++
++def test_best_acc_bpc_prefers_higher_accuracy_then_lower_loss():
++    logger = Logger(10)
++    # (acc, loss, is the newest evaluation the best so far?)
++    sequence = [
++        (0.50, 1.00, True),   # first evaluation
++        (0.60, 1.10, True),   # higher accuracy wins although the loss is higher
++        (0.60, 1.05, True),   # same accuracy, lower loss
++        (0.60, 1.20, False),  # same accuracy, higher loss
++        (0.55, 0.90, False),  # lower accuracy loses although the loss is lower
++        (0.60, 1.05, False),  # exact tie with an earlier evaluation: the earlier one is kept
++        (0.61, 1.30, True),
++    ]
++    for it, (acc, loss, expected) in enumerate(sequence):
++        logger.log_eval(it, _metrics(acc, loss))
++        assert logger.last_is_best_acc_bpc() is expected, (it, acc, loss)
++
++
++@pytest.mark.parametrize("selection,prefix", [("loss", "best_loss_all_"), ("acc", "best_acc_bpc_")])
++def test_selected_checkpoint(selection, prefix):
++    config = make_config()
++    config.training.checkpoint_selection = selection
++    assert train.selected_checkpoint(config)[0] == prefix
++
++
++def test_default_selection_is_validation_loss():
++    assert make_config().training.checkpoint_selection == "loss"
++    config = train.resolve_config(train.load_config(train.REPO_ROOT / "configs" / "final" / "TR.yaml"))
++    assert train.selected_checkpoint(config)[0] == "best_loss_all_"
++
++
++def test_unknown_selection_is_rejected():
++    config = make_config()
++    config.training.checkpoint_selection = "bpc"
++    with pytest.raises(ValueError, match="checkpoint_selection"):
++        train.selected_checkpoint(config)

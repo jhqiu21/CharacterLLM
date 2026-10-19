@@ -1,0 +1,19 @@
+HEAD 73f222e01b81864358bb5ccef4e8df80e179bf0e
+patch sha256[:12] 525a4adda185
+untracked source files: ['results/v6/aggregate_v6.py', 'results/v6/configs/AL-14M.yaml', 'results/v6/configs/AL-3M.yaml', 'scripts/analyze_errors.py', 'scripts/launch_v6.py', 'tests/test_analyze_errors.py', 'tests/test_checkpoint_selection.py']
+
+git status --porcelain:
+ M results/README.md
+ M scripts/eval_extrapolation.py
+ M tests/test_cli.py
+ M tests/test_full_context_eval.py
+ M tests/test_long_context.py
+ M train.py
+ M utils/checkpoint_saver.py
+ M utils/full_context_eval.py
+ M utils/logger.py
+?? results/v6/
+?? scripts/analyze_errors.py
+?? scripts/launch_v6.py
+?? tests/test_analyze_errors.py
+?? tests/test_checkpoint_selection.py

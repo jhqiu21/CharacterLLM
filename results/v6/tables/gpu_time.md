@@ -1,0 +1,13 @@
+GPU time of this round (RTX 3090s; GPU 3 only until 14:43, then GPUs 2 and 3 with one job per GPU); seconds per job from runs/v6_status.jsonl. Wall clock from the first job's start to the last job's end: 2026-10-17 10:52:46 to 2026-10-17 17:18:51.
+
+| phase | jobs | complete | GPU hours (sum of job wall times) | foreign GPU processes seen |
+|---|---|---|---|---|
+| v5topk | 9 | 9 | 0.29 | none |
+| search | 6 | 6 | 1.29 | none |
+| formal | 2 | 2 | 1.91 | none |
+| seeds | 4 | 4 | 3.82 | none |
+| bracket | 2 | 2 | 0.43 | none |
+| evals | 24 | 24 | 0.70 | none |
+| total | 47 | 47 | 8.42 |  |
+| of which GPU 2 | 14 | 14 | 2.37 |  |
+| of which GPU 3 | 33 | 33 | 6.05 |  |

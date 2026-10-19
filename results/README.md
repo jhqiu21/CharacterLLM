@@ -5,6 +5,7 @@ final configuration was reached and are kept for traceability; their numbers are
 
 | folder | status | what it holds |
 |---|---|---|
+| [`v6/`](v6/REPORT.md) | current (follow-up, not in the report yet) | Capacity study: ALiBi 3.2M vs 14.2M trained from scratch on 512-character windows (819M training characters, checkpoints selected by validation accuracy), Acc_all / Top-k of the best v5 models. `aggregate_v6.py` rebuilds its tables and figures from `v6/raw/` (+ `v5/raw/`, `v3/raw/`); `code/` holds the code snapshots (HEAD + uncommitted diff) taken at every launch. |
 | [`v5/`](v5/REPORT.md) | current (follow-up, not in the report yet) | Fixing RoPE beyond its training length: evaluation-only variants (local attention, SelfExtend) and long-window fine-tuning with and without position interpolation, 1,000 and 4,000 iterations. `aggregate_v5.py` rebuilds its tables and figures from `v5/raw/` (+ `v3/raw/`, `v4/raw/` for reference rows). |
 | [`v4/`](v4/REPORT.md) | **current** | Final tables and figures of the report: Transformer vs LSTMs, seven positional encodings (incl. NoPE), dropout, length extrapolation (incl. position interpolation), attention analysis, learning-rate bracket check. `aggregate_v4.py` rebuilds everything; `claims.md` traces every number in the report to a file. |
 | [`v3/`](v3/REPORT.md) | current raw data, superseded tables | The 36 final 50k-iteration runs (3 seeds each), extrapolation and attention evaluations. `v3/raw/` is read by `v4/aggregate_v4.py`; `v3/tables` and `v3/figures` use the old model names (TR, LR-1, LR-2). |

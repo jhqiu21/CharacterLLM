@@ -1,0 +1,28 @@
+{
+  "best": {
+    "test_loss": 0.9943249225616455,
+    "test_loss_iter": 9999,
+    "test_loss_last": 0.9449053406715393,
+    "test_loss_last_iter": 9999,
+    "test_acc": 0.69110107421875,
+    "test_acc_iter": 9999,
+    "test_acc_last": 0.71484375,
+    "test_acc_last_iter": 9500
+  },
+  "final_avg": {
+    "test_loss_mean": 1.0230029821395874,
+    "test_loss_std": 0.02628360688686371,
+    "test_loss_last_mean": 0.9764788746833801,
+    "test_loss_last_std": 0.03214658051729202,
+    "test_acc_mean": 0.682162880897522,
+    "test_acc_std": 0.008136271499097347,
+    "test_acc_last_mean": 0.7032226324081421,
+    "test_acc_last_std": 0.01027434691786766,
+    "n_checkpoints": 10
+  },
+  "training": {
+    "total_time": 1036.3248784542084,
+    "total_iterations": 10000,
+    "time_per_iter": 0.10363248784542084
+  }
+}

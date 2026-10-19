@@ -1,0 +1,52 @@
+{
+ "window": 512,
+ "stride": 128,
+ "n_scored": 4999999,
+ "acc": 0.7322585464517093,
+ "bpc": 1.2433806590378085,
+ "groups": {
+  "space": {
+   "count": 855232,
+   "share_of_targets": 0.17104643420928684,
+   "acc": 0.9466203322607198,
+   "bpc": 0.2716855117322692,
+   "share_of_errors": 0.034101562179027975
+  },
+  "1st letter": {
+   "count": 855232,
+   "share_of_targets": 0.17104643420928684,
+   "acc": 0.3172893437102447,
+   "bpc": 3.3245602024775214,
+   "share_of_errors": 0.4361492096478169
+  },
+  "2nd letter": {
+   "count": 822358,
+   "share_of_targets": 0.1644716328943266,
+   "acc": 0.6287663037266008,
+   "bpc": 1.5792731146688725,
+   "share_of_errors": 0.22804616693570737
+  },
+  "3rd letter": {
+   "count": 705156,
+   "share_of_targets": 0.14103122820624564,
+   "acc": 0.7325003261689612,
+   "bpc": 1.2261413921007247,
+   "share_of_errors": 0.14090387216919012
+  },
+  "4th+ letter": {
+   "count": 1762021,
+   "share_of_targets": 0.3524042704808541,
+   "acc": 0.8778317625045331,
+   "bpc": 0.5550040536589934,
+   "share_of_errors": 0.16079918906825766
+  }
+ },
+ "seconds": 48.043943643569946,
+ "run": "v6-AL-14M_s42",
+ "checkpoint": "best_acc_bpc_",
+ "step": 49000,
+ "split": "test",
+ "batch_size": 256,
+ "git_commit": "73f222e01b81864358bb5ccef4e8df80e179bf0e-dirty",
+ "device": "NVIDIA GeForce RTX 3090"
+}

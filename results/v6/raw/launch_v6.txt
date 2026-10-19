@@ -1,0 +1,76 @@
+[2026-10-17 10:52:45] GPUs [3]; phase v5topk; skipped (finished): []
+Queue:
+  topk:ft4k-alibi512_lr3e-5_s42: scripts/eval_extrapolation.py --run ft4k-alibi512_lr3e-5_s42 --lengths 128 256 512 1024 --tag v6
+  topk:ft4k-alibi512_lr3e-5_s43: scripts/eval_extrapolation.py --run ft4k-alibi512_lr3e-5_s43 --lengths 128 256 512 1024 --tag v6
+  topk:ft4k-alibi512_lr3e-5_s44: scripts/eval_extrapolation.py --run ft4k-alibi512_lr3e-5_s44 --lengths 128 256 512 1024 --tag v6
+  topk:ft4k-long512_lr3e-4_s42: scripts/eval_extrapolation.py --run ft4k-long512_lr3e-4_s42 --lengths 128 256 512 1024 --tag v6
+  topk:ft4k-long512_lr3e-4_s43: scripts/eval_extrapolation.py --run ft4k-long512_lr3e-4_s43 --lengths 128 256 512 1024 --tag v6
+  topk:ft4k-long512_lr3e-4_s44: scripts/eval_extrapolation.py --run ft4k-long512_lr3e-4_s44 --lengths 128 256 512 1024 --tag v6
+  topk:TR-final-alibi_s42: scripts/eval_extrapolation.py --run TR-final-alibi_s42 --lengths 128 256 512 1024 --tag v6
+  topk:TR-final-alibi_s43: scripts/eval_extrapolation.py --run TR-final-alibi_s43 --lengths 128 256 512 1024 --tag v6
+  topk:TR-final-alibi_s44: scripts/eval_extrapolation.py --run TR-final-alibi_s44 --lengths 128 256 512 1024 --tag v6
+code snapshot: results/v6/code/20261017-105245_v5topk_73f222e_c4aa88a40dd0.patch
+[2026-10-17 10:52:46] started topk:ft4k-alibi512_lr3e-5_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run ft4k-alibi512_lr3e-5_s42 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 10:54:40] finished topk:ft4k-alibi512_lr3e-5_s42 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 10:54:40] started topk:ft4k-alibi512_lr3e-5_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run ft4k-alibi512_lr3e-5_s43 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 10:56:34] finished topk:ft4k-alibi512_lr3e-5_s43 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 10:56:34] started topk:ft4k-alibi512_lr3e-5_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run ft4k-alibi512_lr3e-5_s44 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 10:58:28] finished topk:ft4k-alibi512_lr3e-5_s44 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 10:58:28] started topk:ft4k-long512_lr3e-4_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run ft4k-long512_lr3e-4_s42 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 11:00:22] finished topk:ft4k-long512_lr3e-4_s42 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 11:00:22] started topk:ft4k-long512_lr3e-4_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run ft4k-long512_lr3e-4_s43 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 11:02:16] finished topk:ft4k-long512_lr3e-4_s43 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 11:02:16] started topk:ft4k-long512_lr3e-4_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run ft4k-long512_lr3e-4_s44 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 11:04:10] finished topk:ft4k-long512_lr3e-4_s44 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 11:04:10] started topk:TR-final-alibi_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-alibi_s42 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 11:06:04] finished topk:TR-final-alibi_s42 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 11:06:04] started topk:TR-final-alibi_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-alibi_s43 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 11:07:59] finished topk:TR-final-alibi_s43 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 11:07:59] started topk:TR-final-alibi_s44 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python scripts/eval_extrapolation.py --run TR-final-alibi_s44 --lengths 128 256 512 1024 --tag v6
+[2026-10-17 11:09:52] finished topk:TR-final-alibi_s44 on GPU 3: rc=0, complete=True, 1.9 min
+[2026-10-17 11:10:02] queue empty; failed: []
+[2026-10-17 11:10:03] GPUs [3]; phase search; skipped (finished): []
+Queue:
+  v6search-AL-3M_lr9e-4: train.py --config results/v6/configs/AL-3M.yaml --seed 4212 --run-name v6search-AL-3M_lr9e-4 --tuning --set training.learning_rate=9e-4 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+  v6search-AL-3M_lr1.8e-3: train.py --config results/v6/configs/AL-3M.yaml --seed 4212 --run-name v6search-AL-3M_lr1.8e-3 --tuning --set training.learning_rate=1.8e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+  v6search-AL-3M_lr3.6e-3: train.py --config results/v6/configs/AL-3M.yaml --seed 4212 --run-name v6search-AL-3M_lr3.6e-3 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+  v6search-AL-14M_lr9e-4: train.py --config results/v6/configs/AL-14M.yaml --seed 4212 --run-name v6search-AL-14M_lr9e-4 --tuning --set training.learning_rate=9e-4 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+  v6search-AL-14M_lr1.8e-3: train.py --config results/v6/configs/AL-14M.yaml --seed 4212 --run-name v6search-AL-14M_lr1.8e-3 --tuning --set training.learning_rate=1.8e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+  v6search-AL-14M_lr3.6e-3: train.py --config results/v6/configs/AL-14M.yaml --seed 4212 --run-name v6search-AL-14M_lr3.6e-3 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+code snapshot: results/v6/code/20261017-111003_search_73f222e_525a4adda185.patch
+[2026-10-17 11:10:03] started v6search-AL-3M_lr9e-4 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-3M.yaml --seed 4212 --run-name v6search-AL-3M_lr9e-4 --tuning --set training.learning_rate=9e-4 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+[2026-10-17 11:16:47] finished v6search-AL-3M_lr9e-4 on GPU 3: rc=0, complete=True, 6.7 min
+[2026-10-17 11:16:47] started v6search-AL-3M_lr1.8e-3 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-3M.yaml --seed 4212 --run-name v6search-AL-3M_lr1.8e-3 --tuning --set training.learning_rate=1.8e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+[2026-10-17 11:23:31] finished v6search-AL-3M_lr1.8e-3 on GPU 3: rc=0, complete=True, 6.7 min
+[2026-10-17 11:23:31] started v6search-AL-3M_lr3.6e-3 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-3M.yaml --seed 4212 --run-name v6search-AL-3M_lr3.6e-3 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+[2026-10-17 11:30:15] finished v6search-AL-3M_lr3.6e-3 on GPU 3: rc=0, complete=True, 6.7 min
+[2026-10-17 11:30:15] started v6search-AL-14M_lr9e-4 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-14M.yaml --seed 4212 --run-name v6search-AL-14M_lr9e-4 --tuning --set training.learning_rate=9e-4 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+[2026-10-17 11:49:15] finished v6search-AL-14M_lr9e-4 on GPU 3: rc=0, complete=True, 19.0 min
+[2026-10-17 11:49:15] started v6search-AL-14M_lr1.8e-3 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-14M.yaml --seed 4212 --run-name v6search-AL-14M_lr1.8e-3 --tuning --set training.learning_rate=1.8e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+[2026-10-17 12:08:15] finished v6search-AL-14M_lr1.8e-3 on GPU 3: rc=0, complete=True, 19.0 min
+[2026-10-17 12:08:15] started v6search-AL-14M_lr3.6e-3 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-14M.yaml --seed 4212 --run-name v6search-AL-14M_lr3.6e-3 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=10000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=10000
+[2026-10-17 12:27:25] finished v6search-AL-14M_lr3.6e-3 on GPU 3: rc=0, complete=True, 19.2 min
+[2026-10-17 12:27:35] queue empty; failed: []
+phase formal: AL-3M lr 3.6e-3 (search: [('9e-4', 0.672516, 1.523742), ('1.8e-3', 0.678826, 1.495079), ('3.6e-3', 0.681393, 1.482245)])
+phase formal: AL-14M lr 3.6e-3 (search: [('9e-4', 0.701545, 1.386556), ('1.8e-3', 0.705774, 1.367886), ('3.6e-3', 0.706417, 1.363941)])
+[2026-10-17 12:27:36] GPUs [3]; phase formal; skipped (finished): []
+Queue:
+  v6-AL-3M_s42: train.py --config results/v6/configs/AL-3M.yaml --seed 42 --run-name v6-AL-3M_s42 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+  v6-AL-14M_s42: train.py --config results/v6/configs/AL-14M.yaml --seed 42 --run-name v6-AL-14M_s42 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+code snapshot: results/v6/code/20261017-122736_formal_73f222e_c1bce70a26b1.patch
+[2026-10-17 12:27:36] started v6-AL-3M_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-3M.yaml --seed 42 --run-name v6-AL-3M_s42 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+[2026-10-17 12:55:56] finished v6-AL-3M_s42 on GPU 3: rc=0, complete=True, 28.3 min
+[2026-10-17 12:55:56] started v6-AL-14M_s42 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-14M.yaml --seed 42 --run-name v6-AL-14M_s42 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+[2026-10-17 14:21:55] finished v6-AL-14M_s42 on GPU 3: rc=0, complete=True, 86.0 min
+[2026-10-17 14:22:05] queue empty; failed: []
+phase seeds: validation acc AL-14M 73.049% vs AL-3M 70.059% (gain +2.990 pp, rule >= 0.3), BPC 1.2574 vs 1.3950 -> clear gain: run seeds 43, 44
+phase seeds: AL-3M lr 3.6e-3 (search: [('9e-4', 0.672516, 1.523742), ('1.8e-3', 0.678826, 1.495079), ('3.6e-3', 0.681393, 1.482245)])
+phase seeds: AL-14M lr 3.6e-3 (search: [('9e-4', 0.701545, 1.386556), ('1.8e-3', 0.705774, 1.367886), ('3.6e-3', 0.706417, 1.363941)])
+[2026-10-17 14:22:05] GPUs [3]; phase seeds; skipped (finished): []
+Queue:
+  v6-AL-3M_s43: train.py --config results/v6/configs/AL-3M.yaml --seed 43 --run-name v6-AL-3M_s43 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+  v6-AL-3M_s44: train.py --config results/v6/configs/AL-3M.yaml --seed 44 --run-name v6-AL-3M_s44 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+  v6-AL-14M_s43: train.py --config results/v6/configs/AL-14M.yaml --seed 43 --run-name v6-AL-14M_s43 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+  v6-AL-14M_s44: train.py --config results/v6/configs/AL-14M.yaml --seed 44 --run-name v6-AL-14M_s44 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000
+code snapshot: results/v6/code/20261017-142206_seeds_73f222e_e1da0052da03.patch
+[2026-10-17 14:22:06] started v6-AL-3M_s43 on GPU 3: /home/jinhang/miniconda3/envs/charllm-env/bin/python train.py --config results/v6/configs/AL-3M.yaml --seed 43 --run-name v6-AL-3M_s43 --tuning --set training.learning_rate=3.6e-3 --set training.epochs=50000 --set scheduler.warmup_iters=2000 --set training.stage_checkpoint_interval=50000

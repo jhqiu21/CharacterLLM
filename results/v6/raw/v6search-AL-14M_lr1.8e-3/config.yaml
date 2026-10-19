@@ -1,0 +1,71 @@
+model_name: AL-14M
+model:
+  type: transformer
+  vocab_size: 27
+  d_model: 384
+  n_heads: 6
+  n_layers: 8
+  max_len: 512
+  mlp_ratio: 4
+  emb_dropout: 0.0
+  mlp_dropout: 0.0
+  attn_dropout: 0.0
+  resid_dropout: 0.0
+  pos_encoding_type: alibi
+  sinusoidal_scale: unit
+  pos_scale: 1.0
+loss:
+  LABEL_SMOOTHING: true
+  ls_eps: 0.0
+  entropy_lambda: 0.0
+  tail_scheme: linear
+scheduler:
+  warmup_iters: 2000
+  init_value: 0.0
+  end_value: 0.0
+optimizer:
+  b1: 0.9
+  b2: 0.95
+  eps: 1.0e-08
+  weight_decay: 0.1
+  grad_clip_norm: 1.0
+  decay_mask: true
+training:
+  batch_size: 32
+  sequence_length: 512
+  learning_rate: 0.0018
+  epochs: 10000
+  validation_interval: 500
+  stage_checkpoint_interval: 10000
+  checkpoint_selection: acc
+  seed: 4212
+evaluation:
+  sample: true
+  seed: 4212
+  prompt: hello my fri
+  gen_len: 1000
+  temperature: 0.7
+  self_belu_n_grams: 4
+  self_belu_n_samples: 20
+  full_context_stride: 1
+  full_context_batch_size: 256
+  self_bleu_multi_n_prompts: 10
+  self_bleu_multi_n_samples: 20
+  self_bleu_multi_prompt_len: 128
+  tuning_val_stride: 128
+output:
+  checkpoint_dir: ./checkpoints
+  results_dir: ./runs
+run:
+  run_name: v6search-AL-14M_lr1.8e-3
+  seed: 4212
+  legacy_dropout_rng: false
+  tuning: true
+  config_file: results/v6/configs/AL-14M.yaml
+  overrides:
+    training.learning_rate: 0.0018
+    training.epochs: 10000
+    scheduler.warmup_iters: 2000
+    training.stage_checkpoint_interval: 10000
+  git_commit: 73f222e01b81864358bb5ccef4e8df80e179bf0e-dirty
+  init_from: null
